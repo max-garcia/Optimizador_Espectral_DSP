@@ -1,0 +1,21 @@
+# Entornos virtuales
+entorno_dsp/
+venv/
+
+# Archivos de caché compilados
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Archivos de compilación de macOS y PyInstaller
+.DS_Store
+build/
+dist/
+*.spec
+
+# Archivos de audio temporales (Ruido para el repositorio)
+*.wav
+*.mp3
+*.nam
+*.syx
+*.ir
