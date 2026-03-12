@@ -8,6 +8,7 @@ import threading
 
 # Importación estricta del núcleo matemático (Fase 1)
 from motor_dsp import MotorTonalDSP
+from gestor_licencias import CriptografiaHWID  
 
 class OptimizadorGUI:
     def __init__(self, root):
@@ -17,6 +18,11 @@ class OptimizadorGUI:
         
         # Instancia del núcleo matemático
         self.motor = MotorTonalDSP()
+
+        # Instancia del núcleo matemático
+        self.motor = MotorTonalDSP()
+        # Instancia del motor criptográfico (Candado de Hardware)
+        self.seguridad = CriptografiaHWID()
 
         # --- TOPOLOGÍA BIMODAL (Pestañas) ---
         self.notebook = ttk.Notebook(self.root)
@@ -182,12 +188,43 @@ class OptimizadorGUI:
         self.btn_analizar.config(text="Calcular Ecuación Espectral", state=tk.NORMAL)
 
     def aislar_hilo_sintesis(self):
-        """Prepara el entorno y pide la ruta de guardado en el hilo principal de macOS."""
+        """Compulsa de seguridad criptográfica y preparación del entorno de síntesis."""
         if not hasattr(self, 'ruta_objetivo') or not hasattr(self, 'ruta_fuente'):
             messagebox.showerror("Error Topológico", "Faltan las matrices de audio. Inyecte ambos archivos primero.")
             return
 
-        # Pedir al usuario dónde guardar el archivo ANTES de congelar el hilo
+        # --- BLOQUE DE SEGURIDAD ESTRICTA (HWID) ---
+        try:
+            # 1. Extracción del vector de hardware
+            serial_fisico = self.seguridad.extraer_hardware_serial()
+            hash_esperado = self.seguridad.generar_llave_maestra(serial_fisico)
+            
+            # 2. Verificación de existencia del archivo físico
+            ruta_licencia = "licencia.key"
+            if not os.path.exists(ruta_licencia):
+                mensaje_bloqueo = (
+                    "ACCESO DENEGADO (Modo Freemium)\n\n"
+                    "La síntesis de hardware está bloqueada.\n"
+                    f"HWID de su equipo: {serial_fisico}\n\n"
+                    "Contacte al desarrollador para adquirir su llave matemática."
+                )
+                messagebox.showwarning("Licencia Requerida", mensaje_bloqueo)
+                return # Abortar ejecución
+                
+            # 3. Verificación de integridad criptográfica
+            with open(ruta_licencia, "r") as archivo:
+                llave_usuario = archivo.read().strip()
+                
+            if llave_usuario != hash_esperado:
+                messagebox.showerror("Violación de Seguridad", "La licencia detectada es inválida o no corresponde a este hardware.")
+                return # Abortar ejecución
+                
+        except Exception as e:
+            messagebox.showerror("Fallo en Módulo de Seguridad", f"Error al verificar la topología del hardware: {e}")
+            return
+        # --- FIN DEL BLOQUE DE SEGURIDAD ---
+
+        # Si el código llega aquí, la matemática validó al usuario. Se procede con la exportación.
         ruta_guardado = filedialog.asksaveasfilename(
             title="Exportar Filtro FIR de Fase Mínima",
             defaultextension=".wav",
@@ -195,14 +232,11 @@ class OptimizadorGUI:
         )
         
         if not ruta_guardado:
-            return # El usuario canceló la operación
+            return
 
         self.btn_exportar.config(text="Sintetizando Tensor...", state=tk.DISABLED)
-        
-        # Extraer la selección del hardware (Line 6, Fractal, Kemper)
         seleccion_hw = self.variable_hardware.get()
         
-        # Desacoplar el cálculo Cepstral hacia un núcleo secundario
         hilo = threading.Thread(target=self.ejecutar_sintesis_dsp, args=(ruta_guardado, seleccion_hw))
         hilo.start()
 
