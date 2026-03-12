@@ -125,12 +125,19 @@ class MotorTonalDSP:
             
         return ir_hardware
         
-    def exportar_ir(self, vector_ir, nombre_archivo="IR_Clonado_DSP.wav"):
+    def exportar_ir(self, vector_ir, nombre_archivo="IR_Clonado_DSP.wav", target_sr_export=None):
         """
         Escribe la matriz unidimensional en un archivo de audio PCM de 24-bit.
+        Inyecta un remuestreo analítico si el hardware (ej. Kemper) exige una base de tiempo distinta.
         """
-        # El formato 'PCM_24' garantiza la resolución que exige Fractal y Line 6
-        sf.write(nombre_archivo, vector_ir, self.target_sr, subtype='PCM_24')
+        sr_final = target_sr_export if target_sr_export else self.target_sr
+        
+        # Si el hardware destino exige 44.1 kHz, aplicamos un remuestreo de alta calidad
+        if sr_final != self.target_sr:
+            vector_ir = librosa.resample(vector_ir, orig_sr=self.target_sr, target_sr=sr_final)
+            
+        # El formato 'PCM_24' garantiza la resolución que exige la industria
+        sf.write(nombre_archivo, vector_ir, sr_final, subtype='PCM_24')
 
 # --- BLOQUE DE VALIDACIÓN ESTOCÁSTICA ---
 # Este bloque solo se ejecuta si corremos este archivo directamente en la terminal,
@@ -140,31 +147,35 @@ if __name__ == "__main__":
     motor = MotorTonalDSP()
     print(f"Motor DSP inicializado a {motor.target_sr} Hz.")
     
-    # 1. Asigna DOS archivos de audio DISTINTOS
-    ruta_disco = "/Users/mariadelrosariotello/Optimizador_Espectral_DSP/audio_prueba.wav"   # El sonido que quieres lograr
-    ruta_pod = "/Users/mariadelrosariotello/Optimizador_Espectral_DSP/audio_prueba2.wav"     # Tu sonido actual grabado limpio
+    # Asegúrate de colocar las rutas de tus dos audios
+    ruta_disco = "/Users/mariadelrosariotello/Optimizador_Espectral_DSP/audio_prueba.wav" 
+    ruta_pod = "/Users/mariadelrosariotello/Optimizador_Espectral_DSP/audio_prueba2.wav" 
     
     try:
         senal_obj, _ = motor.cargar_audio(ruta_disco)
         senal_fnt, _ = motor.cargar_audio(ruta_pod)
         
-        # Cálculo del espectro
         _, psd_obj = motor.calcular_psd_welch(senal_obj)
         _, psd_fnt = motor.calcular_psd_welch(senal_fnt)
         
-        # Síntesis matemática del IR para hardware
-        # Usamos 1024 muestras que es el límite estándar de la Line 6 POD Go
-        muestras_hardware = 1024 
-        vector_ir_final = motor.sintetizar_filtro_fir(psd_obj, psd_fnt, muestras_salida=muestras_hardware)
+        print("\n--- INICIANDO SÍNTESIS MULTI-HARDWARE ---")
         
-        # Exportación al disco duro
-        nombre_exportacion = "ToneMatch_POD_Go.wav"
-        motor.exportar_ir(vector_ir_final, nombre_exportacion)
+        # 1. LINE 6 (POD Go / Helix) -> 1024 muestras, 48 kHz
+        ir_line6 = motor.sintetizar_filtro_fir(psd_obj, psd_fnt, muestras_salida=1024)
+        motor.exportar_ir(ir_line6, "ToneMatch_Line6_1024.wav")
+        print("✓ Matriz Line 6 compilada (1024 samples, 48 kHz)")
+
+        # 2. FRACTAL AUDIO (Axe-Fx) -> 2048 muestras, 48 kHz
+        ir_fractal = motor.sintetizar_filtro_fir(psd_obj, psd_fnt, muestras_salida=2048)
+        motor.exportar_ir(ir_fractal, "ToneMatch_Fractal_2048.wav")
+        print("✓ Matriz Fractal compilada (2048 samples, 48 kHz)")
+
+        # 3. KEMPER PROFILER -> 2048 muestras, 44.1 kHz (Remuestreo)
+        ir_kemper = motor.sintetizar_filtro_fir(psd_obj, psd_fnt, muestras_salida=2048)
+        motor.exportar_ir(ir_kemper, "ToneMatch_Kemper_44100.wav", target_sr_export=44100)
+        print("✓ Matriz Kemper compilada (2048 samples, downsampled a 44.1 kHz)")
         
-        print("\n--- SÍNTESIS DE HARDWARE COMPLETADA ---")
-        print(f"Filtro FIR de Fase Mínima calculado exitosamente.")
-        print(f"Longitud del tensor: {len(vector_ir_final)} muestras.")
-        print(f"Archivo exportado: {nombre_exportacion}")
+        print("\n--- EXPORTACIÓN COMPLETADA CON ÉXITO ---")
         
     except Exception as e:
         print(f"Colapso en la síntesis: {e}")
