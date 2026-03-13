@@ -1,5 +1,6 @@
 import tkinter as tk
 import os
+import sys
 from tkinter import filedialog, messagebox
 from tkinter import ttk
 from matplotlib.figure import Figure
@@ -8,9 +9,17 @@ import threading
 import requests
 from PIL import Image, ImageTk
 
-# Importación estricta del núcleo matemático (Fase 1)
+# Importación estricta del núcleo matemático
 from motor_dsp import MotorTonalDSP
 from gestor_licencias import CriptografiaHWID  
+
+def resolver_ruta(ruta_relativa):
+    """Calcula el vector absoluto al recurso gráfico, resolviendo el entorno _MEIPASS de PyInstaller."""
+    try:
+        ruta_base = sys._MEIPASS
+    except Exception:
+        ruta_base = os.path.abspath(".")
+    return os.path.join(ruta_base, ruta_relativa)
 
 class OptimizadorGUI:
 
@@ -26,7 +35,7 @@ class OptimizadorGUI:
         # 1. INYECCIÓN DEL MENÚ LOCAL (Anclaje Superior Absoluto)
         self.construir_barra_menu()
 
-        # 2. TOPOLOGÍA BIMODAL (Pestañas)
+        # 2. TOPOLOGÍA BIMODAL (Pestañas con expansión de fluidos)
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill=tk.BOTH, expand=True, padx=15, pady=10)
 
@@ -48,10 +57,7 @@ class OptimizadorGUI:
         self.construir_firma_ingenieria()   
 
     def construir_barra_menu(self):
-        """
-        Construye una barra de menú local forzada dentro de la ventana principal.
-        Evita la proyección a la barra global de macOS.
-        """
+        """Construye una barra de menú local forzada dentro de la ventana principal."""
         self.frame_menu_local = ttk.Frame(self.root, relief=tk.RAISED, borderwidth=1)
         self.frame_menu_local.pack(side=tk.TOP, fill=tk.X)
 
@@ -110,12 +116,11 @@ class OptimizadorGUI:
         self.lbl_resultado_nam.grid(row=5, column=0, columnspan=2, pady=5)
 
     def construir_rama_hardware(self):
-        """Renderiza la Rama B con anclaje de fluidos para evitar recortes geométricos."""
+        """Renderiza la Rama B con anclaje dinámico."""
         self.frame_master_hw = ttk.Frame(self.tab_hardware)
         self.frame_master_hw.pack(expand=True, fill=tk.BOTH)
 
         frame_controles = ttk.Frame(self.frame_master_hw)
-        # Axioma corregido: pack con expand=True centra dinámicamente respetando los límites
         frame_controles.pack(expand=True, pady=10)
 
         self.btn_cargar_obj = ttk.Button(frame_controles, text="1. Inyectar Tono Objetivo (.wav)", width=30, command=lambda: self.cargar_archivo("Objetivo"))
@@ -153,29 +158,26 @@ class OptimizadorGUI:
     def construir_lienzo_espectral(self):
         """Construye el lienzo en memoria con estética Dark Studio Mode."""
         self.frame_grafica = ttk.LabelFrame(self.root, text="Matriz de Densidad Espectral de Potencia")
-        
-        # Color premium de fondo (Gris Carbón)
         self.color_fondo = '#1A1A1C'
         
-        # Instanciación de la figura matemática
         self.figura = Figure(figsize=(10, 5), dpi=100, facecolor=self.color_fondo)
         self.ax = self.figura.add_subplot(111)
-        self.ax.set_facecolor(self.color_fondo) # Fondo del eje de coordenadas
+        self.ax.set_facecolor(self.color_fondo) 
         
         self.canvas = FigureCanvasTkAgg(self.figura, master=self.frame_grafica)
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
     def mostrar_creditos(self):
         texto = (
-            "Optimizador Espectral DSP v1.0\n\n"
+            "TGN Tone Architect v1.1\n\n"
             "Motor de análisis acústico y Tone Match basado en LTI/NAM.\n"
             "Desarrollado para la evaluación determinista de hardware.\n\n"
-            "Diseño de Sonido y Código: Max G. - The Guitar Notebook"
+            "Diseño de Sonido y Código: Max - The Guitar Notebook"
         )
         messagebox.showinfo("Acerca del Sistema", texto)
 
     def verificar_actualizacion(self):
-        version_local = "v1.0"
+        version_local = "v1.1"
         url_api = "https://api.github.com/repos/max-garcia/Optimizador_Espectral_DSP/releases/latest"
         try:
             respuesta = requests.get(url_api, timeout=5)
@@ -244,21 +246,16 @@ class OptimizadorGUI:
 
     def renderizar_espectro(self, f_obj, p_obj, f_fnt, p_fnt):
         """Dibuja los tensores acústicos aplicando un alto contraste geométrico."""
-        # Expansión del eje Y a 950px para alojar la gráfica sin aplastar los botones
         self.root.geometry("1000x950")
         self.frame_grafica.pack(fill=tk.BOTH, expand=True, padx=15, pady=10)
         
-        # ... (El resto del código Dark Mode que hicimos se mantiene exactamente igual a partir de aquí)
         self.ax.clear()
         
         color_texto = '#E0E0E0'
-        # ... continua tu código ...
         color_rejilla = '#333333'
         
-        # Restauración del fondo exacto
         self.ax.set_facecolor(self.color_fondo)
         
-        # Configuración tipográfica (Uso de sans-serif nativa de macOS)
         fuente_titulo = {'family': 'sans-serif', 'color': color_texto, 'size': 13, 'weight': 'bold'}
         fuente_ejes = {'family': 'sans-serif', 'color': color_texto, 'size': 11}
         
@@ -268,27 +265,22 @@ class OptimizadorGUI:
         self.ax.set_xscale('log')
         self.ax.set_xlim([20, 20000])
         
-        # Estilización de la matriz de rejilla (Subliminal)
         self.ax.grid(True, which="major", color=color_rejilla, linestyle="-", linewidth=0.8, alpha=0.7)
         self.ax.grid(True, which="minor", color=color_rejilla, linestyle=":", linewidth=0.5, alpha=0.3)
         
-        # Ocultamiento de bordes físicos (Filosofía de espacio negativo)
         for spine in self.ax.spines.values():
             spine.set_color(color_rejilla)
             spine.set_linewidth(1)
             
         self.ax.tick_params(axis='both', colors=color_texto, labelsize=10)
         
-        # Inyección de los tensores con grosor estético para efecto luminoso
         self.ax.plot(f_obj, p_obj, label="Tono Objetivo (Disco)", color='#00ffcc', alpha=0.85, linewidth=1.8)
         self.ax.plot(f_fnt, p_fnt, label="Tono Analizado (Hardware)", color='#ff00ff', alpha=0.85, linewidth=1.8)
         
-        # Leyenda minimalista
         leyenda = self.ax.legend(facecolor=self.color_fondo, edgecolor=color_rejilla, fontsize=10)
         for texto_leyenda in leyenda.get_texts():
             texto_leyenda.set_color(color_texto)
             
-        # Refresco algorítmico del lienzo (Elimina recortes de márgenes)
         self.figura.tight_layout() 
         self.canvas.draw()
         
@@ -297,31 +289,47 @@ class OptimizadorGUI:
 
     def aislar_hilo_sintesis(self):
         if not hasattr(self, 'ruta_objetivo') or not hasattr(self, 'ruta_fuente'):
-            messagebox.showerror("Error", "Faltan las matrices de audio.")
+            messagebox.showerror("Error Topológico", "Faltan las matrices de audio.")
             return
+        
         try:
             serial_fisico = self.seguridad.extraer_hardware_serial()
             hash_esperado = self.seguridad.generar_llave_maestra(serial_fisico)
-            if not os.path.exists("licencia.key"):
-                messagebox.showwarning("Bloqueo", "Síntesis bloqueada. Requiere licencia.")
+            
+            # 1. Cálculo del vector absoluto del directorio de ejecución
+            if getattr(sys, 'frozen', False):
+                directorio_base = os.path.dirname(sys.executable)
+                if sys.platform == "darwin" and ".app/Contents/MacOS" in directorio_base:
+                    directorio_base = os.path.abspath(os.path.join(directorio_base, "../../.."))
+            else:
+                directorio_base = os.path.abspath(os.path.dirname(__file__))
+
+            # 2. Evaluación de la compuerta criptográfica con ruta absoluta
+            ruta_licencia = os.path.join(directorio_base, "licencia.key")
+
+            if not os.path.exists(ruta_licencia):
+                # Desvío al Modal Comercial
+                self.root.after(0, lambda: self.mostrar_ventana_activacion(directorio_base))
                 return 
-            with open("licencia.key", "r") as archivo:
+                
+            with open(ruta_licencia, "r") as archivo:
                 if archivo.read().strip() != hash_esperado:
-                    messagebox.showerror("Seguridad", "Licencia inválida.")
-                    return 
+                    messagebox.showerror("Seguridad", "Firma criptográfica inválida.")
+                    return
+                    
         except Exception as e:
-            messagebox.showerror("Seguridad", f"Error de hardware: {e}")
+            messagebox.showerror("Seguridad", f"Colapso en lectura de hardware: {e}")
             return
 
+        # 3. Flujo normal de guardado
         ruta_guardado = filedialog.asksaveasfilename(defaultextension=".wav", filetypes=[("WAV", "*.wav")])
         if not ruta_guardado:
             return
         self.btn_exportar.config(text="Sintetizando...", state=tk.DISABLED)
         threading.Thread(target=self.ejecutar_sintesis_dsp, args=(ruta_guardado, self.variable_hardware.get())).start()
-
+    
     def ejecutar_sintesis_dsp(self, ruta_guardado, seleccion_hw):
         try:
-            # 1. Enrutamiento estricto de topologías de hardware
             muestras = 1024
             sr_salida = 48000
             
@@ -334,22 +342,16 @@ class OptimizadorGUI:
             elif "ToneX" in seleccion_hw:
                 muestras = 1024
                 sr_salida = 44100
-            # Line 6 y Quad Cortex operan bajo la variable por defecto (1024 | 48k)
 
-            # 2. Ingesta estricta de las matrices
             senal_obj, _ = self.motor.cargar_audio(self.ruta_objetivo)
             senal_fnt, _ = self.motor.cargar_audio(self.ruta_fuente)
             
             _, psd_obj = self.motor.calcular_psd_welch(senal_obj)
             _, psd_fnt = self.motor.calcular_psd_welch(senal_fnt)
 
-            # 3. Resolución de la ecuación (Transformada de Hilbert para Fase Mínima)
             vector_ir = self.motor.sintetizar_filtro_fir(psd_obj, psd_fnt, muestras_salida=muestras)
-            
-            # 4. Escritura en disco (PCM 24-bit) con el remuestreo acústico exacto
             self.motor.exportar_ir(vector_ir, ruta_guardado, target_sr_export=sr_salida)
 
-            # 5. Notificación de éxito retornada al hilo principal
             self.root.after(0, lambda: messagebox.showinfo(
                 "Síntesis Exitosa", 
                 f"Matriz FIR compilada para el ecosistema seleccionado.\n\n"
@@ -364,7 +366,6 @@ class OptimizadorGUI:
             self.root.after(0, lambda: self.btn_exportar.config(text="Sintetizar Filtro FIR", state=tk.NORMAL))
 
     def actualizar_progreso(self, valor):
-        """Actualiza el vector de la barra y el porcentaje numérico de forma asíncrona."""
         self.barra_progreso['value'] = valor
         self.lbl_porcentaje.config(text=f"{int(valor)}%")
 
@@ -374,16 +375,14 @@ class OptimizadorGUI:
             return
         
         self.btn_buscar_nam.config(text="Escaneando... (Espere)", state=tk.DISABLED)
-        self.lbl_resultado_nam.config(text="Calculando producto cartesiano...")
+        self.lbl_resultado_nam.config(text="Calculando ...")
         
-        # Reseteo del vector antes del nuevo cálculo
         self.barra_progreso['value'] = 0
         self.lbl_porcentaje.config(text="0%")
         
         threading.Thread(target=self.ejecutar_busqueda_dsp).start()
 
     def ejecutar_busqueda_dsp(self):
-        import os
         try:
             senal_obj, _ = self.motor.cargar_audio(self.ruta_objetivo_nam)
             freqs_obj, psd_obj = self.motor.calcular_psd_welch(senal_obj)
@@ -404,7 +403,6 @@ class OptimizadorGUI:
             ir_ganador = None
             psd_ganador = None
             
-            # Constantes algebraicas para el progreso
             total_iteraciones = len(archivos_nam) * len(banco_irs)
             iteracion_actual = 0
 
@@ -423,7 +421,6 @@ class OptimizadorGUI:
                             ir_ganador = nombre_ir
                             psd_ganador = psd_test
 
-                        # Desplazamiento del límite vectorial y renderizado asíncrono
                         iteracion_actual += 1
                         progreso = (iteracion_actual / total_iteraciones) * 100
                         self.root.after(0, lambda p=progreso: self.actualizar_progreso(p))
@@ -435,9 +432,7 @@ class OptimizadorGUI:
                 nivel = self.var_tolerancia.get()
                 umbral = 5.0 if "Perfección" in nivel else 15.0 if "Aceptable" in nivel else 30.0
                 if menor_mse <= umbral:
-                    # Formateo estricto del veredicto final
                     texto_final = f"Amplificador (.nam): {amp_ganador}\nIR: {ir_ganador}"
-                    # Color Cyan Neón para mantener el Dark Studio Mode
                     self.root.after(0, lambda: self.lbl_resultado_nam.config(text=texto_final, foreground="#00ffcc"))
                     self.root.after(0, self.renderizar_espectro, freqs_obj, psd_obj, freqs_obj, psd_ganador)
                 else:
@@ -449,41 +444,34 @@ class OptimizadorGUI:
             self.root.after(0, lambda: messagebox.showerror("Colapso Analítico", str(e)))
         finally:
             self.root.after(0, lambda: self.btn_buscar_nam.config(text="Ejecutar Matriz Combinatoria", state=tk.NORMAL))
+   
     def construir_firma_ingenieria(self):
-        """
-        Construye el bloque inferior de la interfaz, alojando los controles 
-        globales a la izquierda y el branding minimalista a la derecha.
-        """
+        """Construye el bloque inferior de la interfaz con los controles globales."""
         frame_branding = ttk.Frame(self.root)
         frame_branding.pack(side=tk.BOTTOM, fill=tk.X, padx=20, pady=10)
 
-        # --- SECCIÓN IZQUIERDA: Controles Globales ---
         self.btn_limpiar = ttk.Button(frame_branding, text="Limpiar Entorno", width=15, command=self.limpiar_entorno)
         self.btn_limpiar.pack(side=tk.LEFT, padx=(0, 10))
 
         self.btn_salir = ttk.Button(frame_branding, text="Salir", width=10, command=self.salir_aplicacion)
         self.btn_salir.pack(side=tk.LEFT)
 
-        # --- SECCIÓN DERECHA: Firma y Logo ---
-        lbl_texto = ttk.Label(frame_branding, text="Max G.  |  The Guitar Notebook", style='Branding.TLabel')
+        lbl_texto = ttk.Label(frame_branding, text="Max  |  The Guitar Notebook", style='Branding.TLabel')
         lbl_texto.pack(side=tk.RIGHT, pady=5)
 
         try:
-            img = Image.open("logo_tgn.png")
+            ruta_logo = resolver_ruta("logo_tgn.png")
+            img = Image.open(ruta_logo)
             img = img.resize((35, 35), Image.Resampling.LANCZOS)
             self.logo_renderizado = ImageTk.PhotoImage(img)
 
             lbl_logo = ttk.Label(frame_branding, image=self.logo_renderizado)
             lbl_logo.pack(side=tk.RIGHT, padx=10)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Fallo gráfico: {e}") 
 
     def limpiar_entorno(self):
-        """
-        Purga las variables de estado, restaura la geometría 
-        y limpia la matriz visual para un nuevo análisis.
-        """
-        # 1. Purga de tensores en RAM
+        """Purga las variables de estado y limpia la matriz visual."""
         atributos_estado = [
             'ruta_objetivo', 'ruta_fuente', 
             'ruta_objetivo_nam', 'ruta_di_nam', 
@@ -493,26 +481,83 @@ class OptimizadorGUI:
             if hasattr(self, attr):
                 delattr(self, attr)
         
-        # 2. Restauración del estado visual (Rama A)
         self.btn_cargar_obj_nam.config(text="1. Tono Objetivo (.wav)")
         self.btn_cargar_di_nam.config(text="2. Tono DI Limpio (.wav)")
         self.btn_cargar_dir_nam.config(text="3. Carpeta Cabezales (.nam)")
         self.btn_cargar_dir_ir.config(text="4. Carpeta Gabinetes IR (.wav)")
         
-        # Uso estricto de la tipografía asignada para mantener la coherencia
         self.lbl_resultado_nam.config(text="Estado: Esperando tensores...", foreground="") 
         
-        # 3. Restauración del estado visual (Rama B)
         self.btn_cargar_obj.config(text="1. Inyectar Tono Objetivo (.wav)")
         self.btn_cargar_fnt.config(text="2. Inyectar Tono Grabado (.wav)")
         
-        # 4. Colapso del Lienzo Espectral y contracción geométrica
         self.frame_grafica.pack_forget()
         self.ax.clear()
         self.root.geometry("1000x420")       
-        # 5. Purga de la Matriz de Progreso
+        
         self.barra_progreso['value'] = 0
         self.lbl_porcentaje.config(text="0%") 
+
+    def mostrar_ventana_activacion(self, directorio_base):
+        """Renderiza la topología de la compuerta comercial para inyectar la llave."""
+        ventana_act = tk.Toplevel(self.root)
+        ventana_act.title("Activación de Producto - The Guitar Notebook")
+        ventana_act.geometry("550x300")
+        ventana_act.resizable(False, False)
+        
+        try:
+            serial_cliente = self.seguridad.extraer_hardware_serial()
+        except Exception as e:
+            serial_cliente = f"Error de lectura: {e}"
+
+        frame_interno = ttk.Frame(ventana_act, padding=20)
+        frame_interno.pack(fill=tk.BOTH, expand=True)
+
+        lbl_titulo = ttk.Label(frame_interno, text="Licencia Requerida", font=('SF Pro Display', 16, 'bold'))
+        lbl_titulo.pack(pady=(0, 10))
+
+        lbl_instruccion = ttk.Label(frame_interno, 
+                                    text="Para habilitar la síntesis de filtros FIR, envíe su Hardware ID\n"
+                                         "a The Guitar Notebook para adquirir su llave criptográfica.",
+                                    justify=tk.CENTER, font=('SF Pro Display', 13))
+        lbl_instruccion.pack(pady=(0, 15))
+
+        # Hardware ID: Uso estricto de tipografía matemática
+        frame_hwid = ttk.Frame(frame_interno)
+        frame_hwid.pack(fill=tk.X, pady=5)
+        ttk.Label(frame_hwid, text="Hardware ID:", font=('SF Pro Display', 12, 'bold')).pack(side=tk.LEFT)
+        
+        entrada_hwid = ttk.Entry(frame_hwid, font=('Times New Roman', 13))
+        entrada_hwid.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(10, 0))
+        entrada_hwid.insert(0, serial_cliente)
+        entrada_hwid.config(state='readonly') 
+
+        # Hash Hexadecimal: Uso estricto de tipografía matemática
+        frame_llave = ttk.Frame(frame_interno)
+        frame_llave.pack(fill=tk.X, pady=15)
+        ttk.Label(frame_llave, text="Llave de Acceso:", font=('SF Pro Display', 12, 'bold')).pack(side=tk.LEFT)
+        
+        entrada_llave = ttk.Entry(frame_llave, font=('Times New Roman', 13))
+        entrada_llave.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(10, 0))
+
+        def validar_e_inyectar():
+            llave_ingresada = entrada_llave.get().strip()
+            hash_esperado = self.seguridad.generar_llave_maestra(serial_cliente)
+            
+            if llave_ingresada == hash_esperado:
+                ruta_licencia = os.path.join(directorio_base, "licencia.key")
+                try:
+                    with open(ruta_licencia, "w") as archivo:
+                        archivo.write(llave_ingresada)
+                    messagebox.showinfo("Éxito", "Criptografía validada. El Optimizador Espectral está completamente operativo.", parent=ventana_act)
+                    ventana_act.destroy()
+                except Exception as e:
+                    messagebox.showerror("Error de E/S", f"No se pudo escribir el archivo: {e}", parent=ventana_act)
+            else:
+                messagebox.showerror("Rechazado", "La llave criptográfica no corresponde a este Hardware ID.", parent=ventana_act)
+
+        btn_activar = ttk.Button(frame_interno, text="Activar Software", command=validar_e_inyectar)
+        btn_activar.pack(pady=10)
 
 if __name__ == "__main__":
     raiz = tk.Tk()
