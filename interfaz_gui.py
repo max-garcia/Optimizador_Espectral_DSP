@@ -6,27 +6,29 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import threading
 import requests
+from PIL import Image, ImageTk
 
 # Importación estricta del núcleo matemático (Fase 1)
 from motor_dsp import MotorTonalDSP
 from gestor_licencias import CriptografiaHWID  
 
 class OptimizadorGUI:
+
     def __init__(self, root):
         self.root = root
-        self.root.title("Optimizador Espectral DSP - Ingeniería Acústica")
-        self.root.geometry("1000x350")
+        self.root.title("TGN Tone Architect - The Guitar Notebook")
+        self.root.geometry("1000x420")
         
         # Instancia del núcleo matemático y criptográfico
         self.motor = MotorTonalDSP()
         self.seguridad = CriptografiaHWID()
 
-        # 1. INYECCIÓN DEL MENÚ LOCAL (Antes del Notebook)
+        # 1. INYECCIÓN DEL MENÚ LOCAL (Anclaje Superior Absoluto)
         self.construir_barra_menu()
 
         # 2. TOPOLOGÍA BIMODAL (Pestañas)
         self.notebook = ttk.Notebook(self.root)
-        self.notebook.pack(fill=tk.BOTH, expand=False, padx=15, pady=10)
+        self.notebook.pack(fill=tk.BOTH, expand=True, padx=15, pady=10)
 
         self.tab_nam = ttk.Frame(self.notebook)
         self.tab_hardware = ttk.Frame(self.notebook)
@@ -41,6 +43,9 @@ class OptimizadorGUI:
         self.construir_rama_nam()
         self.construir_rama_hardware()
         self.construir_lienzo_espectral()
+
+        # 4. INYECCIÓN DE LA FIRMA (Anclaje Inferior Absoluto)
+        self.construir_firma_ingenieria()   
 
     def construir_barra_menu(self):
         """
@@ -62,65 +67,101 @@ class OptimizadorGUI:
         self.btn_menu_sistema["menu"] = self.menu_desplegable
 
     def construir_rama_nam(self):
-        frame_controles_nam = ttk.Frame(self.tab_nam)
-        frame_controles_nam.pack(fill=tk.X, padx=20, pady=20)
+        """Renderiza la Rama A con anclaje de fluidos y barra de progreso escalar."""
+        self.frame_master_nam = ttk.Frame(self.tab_nam)
+        self.frame_master_nam.pack(expand=True, fill=tk.BOTH)
 
-        self.btn_cargar_obj_nam = ttk.Button(frame_controles_nam, text="1. Tono Objetivo (.wav)", command=lambda: self.cargar_archivo("Objetivo_NAM"))
-        self.btn_cargar_obj_nam.grid(row=0, column=0, padx=10, pady=5)
+        frame_controles_nam = ttk.Frame(self.frame_master_nam)
+        frame_controles_nam.pack(expand=True, pady=10)
 
-        self.btn_cargar_di_nam = ttk.Button(frame_controles_nam, text="2. Tono DI Limpio (.wav)", command=lambda: self.cargar_archivo("DI_NAM"))
-        self.btn_cargar_di_nam.grid(row=0, column=1, padx=10, pady=5)
+        self.btn_cargar_obj_nam = ttk.Button(frame_controles_nam, text="1. Tono Objetivo (.wav)", width=30, command=lambda: self.cargar_archivo("Objetivo_NAM"))
+        self.btn_cargar_obj_nam.grid(row=0, column=0, padx=15, pady=5)
 
-        self.btn_cargar_dir_nam = ttk.Button(frame_controles_nam, text="3. Carpeta Cabezales (.nam)", command=self.seleccionar_directorio_nam)
-        self.btn_cargar_dir_nam.grid(row=1, column=0, padx=10, pady=15)
+        self.btn_cargar_di_nam = ttk.Button(frame_controles_nam, text="2. Tono DI Limpio (.wav)", width=30, command=lambda: self.cargar_archivo("DI_NAM"))
+        self.btn_cargar_di_nam.grid(row=0, column=1, padx=15, pady=5)
 
-        self.btn_cargar_dir_ir = ttk.Button(frame_controles_nam, text="4. Carpeta Gabinetes IR (.wav)", command=self.seleccionar_directorio_ir)
-        self.btn_cargar_dir_ir.grid(row=1, column=1, padx=10, pady=15)
+        self.btn_cargar_dir_nam = ttk.Button(frame_controles_nam, text="3. Carpeta Cabezales (.nam)", width=30, command=self.seleccionar_directorio_nam)
+        self.btn_cargar_dir_nam.grid(row=1, column=0, padx=15, pady=5)
+
+        self.btn_cargar_dir_ir = ttk.Button(frame_controles_nam, text="4. Carpeta Gabinetes IR (.wav)", width=30, command=self.seleccionar_directorio_ir)
+        self.btn_cargar_dir_ir.grid(row=1, column=1, padx=15, pady=5)
 
         self.var_tolerancia = tk.StringVar()
-        self.selector_tolerancia = ttk.Combobox(frame_controles_nam, textvariable=self.var_tolerancia, state="readonly", width=35)
+        self.selector_tolerancia = ttk.Combobox(frame_controles_nam, textvariable=self.var_tolerancia, state="readonly", width=45, justify='center')
         self.selector_tolerancia['values'] = ("Perfección Topológica (MSE < 5.0)", "Aceptable Comercial (MSE < 15.0)", "Aproximación (MSE < 30.0)")
         self.selector_tolerancia.current(1)
-        self.selector_tolerancia.grid(row=2, column=0, columnspan=2, pady=5)
+        self.selector_tolerancia.grid(row=2, column=0, columnspan=2, pady=10)
 
-        self.btn_buscar_nam = ttk.Button(frame_controles_nam, text="Ejecutar Matriz Combinatoria", command=self.aislar_hilo_busqueda_nam)
-        self.btn_buscar_nam.grid(row=3, column=0, columnspan=2, pady=15)
+        self.btn_buscar_nam = ttk.Button(frame_controles_nam, text="Ejecutar Matriz Combinatoria", width=40, command=self.aislar_hilo_busqueda_nam)
+        self.btn_buscar_nam.grid(row=3, column=0, columnspan=2, pady=10)
 
-        self.lbl_resultado_nam = ttk.Label(frame_controles_nam, text="Estado: Esperando tensores...", font=('Helvetica', 12, 'bold'))
-        self.lbl_resultado_nam.grid(row=4, column=0, columnspan=2, pady=5)
+        # Matriz de Progreso (Vector Horizontal)
+        self.frame_progreso = ttk.Frame(frame_controles_nam)
+        self.frame_progreso.grid(row=4, column=0, columnspan=2, pady=5, sticky=tk.EW)
+        
+        self.barra_progreso = ttk.Progressbar(self.frame_progreso, orient="horizontal", mode="determinate")
+        self.barra_progreso.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(15, 5))
+        
+        # Tipografía matemática estricta para el vector numérico
+        self.lbl_porcentaje = ttk.Label(self.frame_progreso, text="0%", font=('Times New Roman', 12, 'bold'))
+        self.lbl_porcentaje.pack(side=tk.RIGHT, padx=(0, 15))
+
+        self.lbl_resultado_nam = ttk.Label(frame_controles_nam, text="Estado: Esperando tensores...", font=('SF Pro Display', 12, 'bold'), justify='center')
+        self.lbl_resultado_nam.grid(row=5, column=0, columnspan=2, pady=5)
 
     def construir_rama_hardware(self):
-        frame_controles = ttk.Frame(self.tab_hardware)
-        frame_controles.pack(fill=tk.X, padx=20, pady=20)
+        """Renderiza la Rama B con anclaje de fluidos para evitar recortes geométricos."""
+        self.frame_master_hw = ttk.Frame(self.tab_hardware)
+        self.frame_master_hw.pack(expand=True, fill=tk.BOTH)
 
-        self.btn_cargar_obj = ttk.Button(frame_controles, text="1. Inyectar Tono Objetivo (.wav)", command=lambda: self.cargar_archivo("Objetivo"))
-        self.btn_cargar_obj.grid(row=0, column=0, padx=10, pady=5)
+        frame_controles = ttk.Frame(self.frame_master_hw)
+        # Axioma corregido: pack con expand=True centra dinámicamente respetando los límites
+        frame_controles.pack(expand=True, pady=10)
 
-        self.btn_cargar_fnt = ttk.Button(frame_controles, text="2. Inyectar Tono Grabado (.wav)", command=lambda: self.cargar_archivo("Fuente"))
-        self.btn_cargar_fnt.grid(row=0, column=1, padx=10, pady=5)
+        self.btn_cargar_obj = ttk.Button(frame_controles, text="1. Inyectar Tono Objetivo (.wav)", width=30, command=lambda: self.cargar_archivo("Objetivo"))
+        self.btn_cargar_obj.grid(row=0, column=0, padx=15, pady=10)
 
-        ttk.Label(frame_controles, text="3. Ecosistema de Exportación:").grid(row=1, column=0, sticky=tk.E, padx=10, pady=15)
+        self.btn_cargar_fnt = ttk.Button(frame_controles, text="2. Inyectar Tono Grabado (.wav)", width=30, command=lambda: self.cargar_archivo("Fuente"))
+        self.btn_cargar_fnt.grid(row=0, column=1, padx=15, pady=10)
+
+        lbl_ecosistema = ttk.Label(frame_controles, text="3. Ecosistema de Exportación:")
+        lbl_ecosistema.grid(row=1, column=0, columnspan=2, pady=(15, 5))
         
         self.variable_hardware = tk.StringVar()
-        self.selector_hardware = ttk.Combobox(frame_controles, textvariable=self.variable_hardware, state="readonly", width=35)
+        self.selector_hardware = ttk.Combobox(frame_controles, textvariable=self.variable_hardware, state="readonly", width=45, justify='center')
         self.selector_hardware['values'] = (
-            "Line 6 (1024 muestras | 48 kHz)",
-            "Fractal Audio (2048 muestras | 48 kHz)",
-            "Kemper Profiler (2048 muestras | 44.1 kHz)"
+            "Line 6 Helix / Pod Go (1024 muestras | 48 kHz)",
+            "Neural DSP Quad Cortex (1024 muestras | 48 kHz)",
+            "Fractal Audio Axe-Fx / FM (2048 muestras | 48 kHz)",
+            "Headrush FX Prime / Core (2048 muestras | 48 kHz)",
+            "Fender Tone Master Pro (2048 muestras | 48 kHz)",
+            "Kemper Profiler (2048 muestras | 44.1 kHz)",
+            "IK Multimedia ToneX (1024 muestras | 44.1 kHz)"
         )
         self.selector_hardware.current(0)
-        self.selector_hardware.grid(row=1, column=1, sticky=tk.W, padx=10, pady=15)
+        self.selector_hardware.grid(row=2, column=0, columnspan=2, pady=5)
 
-        self.btn_analizar = ttk.Button(frame_controles, text="Calcular Ecuación Espectral", command=self.aislar_hilo_analisis)
-        self.btn_analizar.grid(row=2, column=0, padx=10, pady=10)
+        frame_botones_hw = ttk.Frame(frame_controles)
+        frame_botones_hw.grid(row=3, column=0, columnspan=2, pady=25)
 
-        self.btn_exportar = ttk.Button(frame_controles, text="Sintetizar Filtro FIR", command=self.aislar_hilo_sintesis)
-        self.btn_exportar.grid(row=2, column=1, padx=10, pady=10)
+        self.btn_analizar = ttk.Button(frame_botones_hw, text="Calcular Ecuación Espectral", width=25, command=self.aislar_hilo_analisis)
+        self.btn_analizar.pack(side=tk.LEFT, padx=10)
+
+        self.btn_exportar = ttk.Button(frame_botones_hw, text="Sintetizar Filtro FIR", width=25, command=self.aislar_hilo_sintesis)
+        self.btn_exportar.pack(side=tk.LEFT, padx=10)
 
     def construir_lienzo_espectral(self):
+        """Construye el lienzo en memoria con estética Dark Studio Mode."""
         self.frame_grafica = ttk.LabelFrame(self.root, text="Matriz de Densidad Espectral de Potencia")
-        self.figura = Figure(figsize=(10, 5), dpi=100)
+        
+        # Color premium de fondo (Gris Carbón)
+        self.color_fondo = '#1A1A1C'
+        
+        # Instanciación de la figura matemática
+        self.figura = Figure(figsize=(10, 5), dpi=100, facecolor=self.color_fondo)
         self.ax = self.figura.add_subplot(111)
+        self.ax.set_facecolor(self.color_fondo) # Fondo del eje de coordenadas
+        
         self.canvas = FigureCanvasTkAgg(self.figura, master=self.frame_grafica)
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
@@ -129,7 +170,7 @@ class OptimizadorGUI:
             "Optimizador Espectral DSP v1.0\n\n"
             "Motor de análisis acústico y Tone Match basado en LTI/NAM.\n"
             "Desarrollado para la evaluación determinista de hardware.\n\n"
-            "Diseño de Sonido y Código: Max - The Guitar Notebook"
+            "Diseño de Sonido y Código: Max G. - The Guitar Notebook"
         )
         messagebox.showinfo("Acerca del Sistema", texto)
 
@@ -202,19 +243,55 @@ class OptimizadorGUI:
             self.root.after(0, lambda: self.btn_analizar.config(text="Calcular Ecuación", state=tk.NORMAL))
 
     def renderizar_espectro(self, f_obj, p_obj, f_fnt, p_fnt):
-        self.root.geometry("1000x850")
+        """Dibuja los tensores acústicos aplicando un alto contraste geométrico."""
+        # Expansión del eje Y a 950px para alojar la gráfica sin aplastar los botones
+        self.root.geometry("1000x950")
         self.frame_grafica.pack(fill=tk.BOTH, expand=True, padx=15, pady=10)
+        
+        # ... (El resto del código Dark Mode que hicimos se mantiene exactamente igual a partir de aquí)
         self.ax.clear()
-        self.ax.set_title("Dominio de la Frecuencia (Resolución Acústica)")
-        self.ax.set_xlabel("Frecuencia (Hz) - Escala Logarítmica")
-        self.ax.set_ylabel("Magnitud (dB)")
+        
+        color_texto = '#E0E0E0'
+        # ... continua tu código ...
+        color_rejilla = '#333333'
+        
+        # Restauración del fondo exacto
+        self.ax.set_facecolor(self.color_fondo)
+        
+        # Configuración tipográfica (Uso de sans-serif nativa de macOS)
+        fuente_titulo = {'family': 'sans-serif', 'color': color_texto, 'size': 13, 'weight': 'bold'}
+        fuente_ejes = {'family': 'sans-serif', 'color': color_texto, 'size': 11}
+        
+        self.ax.set_title("Dominio de la Frecuencia (Resolución Acústica)", fontdict=fuente_titulo, pad=15)
+        self.ax.set_xlabel("Frecuencia (Hz) - Escala Logarítmica", fontdict=fuente_ejes)
+        self.ax.set_ylabel("Magnitud (dB)", fontdict=fuente_ejes)
         self.ax.set_xscale('log')
         self.ax.set_xlim([20, 20000])
-        self.ax.grid(True, which="both", ls="--", alpha=0.4)
-        self.ax.plot(f_obj, p_obj, label="Tono Objetivo", color='#00ffcc', alpha=0.8, linewidth=1.5)
-        self.ax.plot(f_fnt, p_fnt, label="Tono Analizado", color='#ff00ff', alpha=0.8, linewidth=1.5)
-        self.ax.legend()
+        
+        # Estilización de la matriz de rejilla (Subliminal)
+        self.ax.grid(True, which="major", color=color_rejilla, linestyle="-", linewidth=0.8, alpha=0.7)
+        self.ax.grid(True, which="minor", color=color_rejilla, linestyle=":", linewidth=0.5, alpha=0.3)
+        
+        # Ocultamiento de bordes físicos (Filosofía de espacio negativo)
+        for spine in self.ax.spines.values():
+            spine.set_color(color_rejilla)
+            spine.set_linewidth(1)
+            
+        self.ax.tick_params(axis='both', colors=color_texto, labelsize=10)
+        
+        # Inyección de los tensores con grosor estético para efecto luminoso
+        self.ax.plot(f_obj, p_obj, label="Tono Objetivo (Disco)", color='#00ffcc', alpha=0.85, linewidth=1.8)
+        self.ax.plot(f_fnt, p_fnt, label="Tono Analizado (Hardware)", color='#ff00ff', alpha=0.85, linewidth=1.8)
+        
+        # Leyenda minimalista
+        leyenda = self.ax.legend(facecolor=self.color_fondo, edgecolor=color_rejilla, fontsize=10)
+        for texto_leyenda in leyenda.get_texts():
+            texto_leyenda.set_color(color_texto)
+            
+        # Refresco algorítmico del lienzo (Elimina recortes de márgenes)
+        self.figura.tight_layout() 
         self.canvas.draw()
+        
         if hasattr(self, 'btn_analizar'):
             self.btn_analizar.config(text="Calcular Ecuación Espectral", state=tk.NORMAL)
 
@@ -244,31 +321,65 @@ class OptimizadorGUI:
 
     def ejecutar_sintesis_dsp(self, ruta_guardado, seleccion_hw):
         try:
+            # 1. Enrutamiento estricto de topologías de hardware
             muestras = 1024
             sr_salida = 48000
-            if "Fractal" in seleccion_hw: muestras = 2048
-            elif "Kemper" in seleccion_hw: muestras, sr_salida = 2048, 44100
             
+            if "Fractal" in seleccion_hw or "Headrush" in seleccion_hw or "Tone Master" in seleccion_hw:
+                muestras = 2048
+                sr_salida = 48000
+            elif "Kemper" in seleccion_hw:
+                muestras = 2048
+                sr_salida = 44100
+            elif "ToneX" in seleccion_hw:
+                muestras = 1024
+                sr_salida = 44100
+            # Line 6 y Quad Cortex operan bajo la variable por defecto (1024 | 48k)
+
+            # 2. Ingesta estricta de las matrices
             senal_obj, _ = self.motor.cargar_audio(self.ruta_objetivo)
             senal_fnt, _ = self.motor.cargar_audio(self.ruta_fuente)
+            
             _, psd_obj = self.motor.calcular_psd_welch(senal_obj)
             _, psd_fnt = self.motor.calcular_psd_welch(senal_fnt)
-            
+
+            # 3. Resolución de la ecuación (Transformada de Hilbert para Fase Mínima)
             vector_ir = self.motor.sintetizar_filtro_fir(psd_obj, psd_fnt, muestras_salida=muestras)
-            self.motor.exportar_ir(vector_ir, ruta_guardado, target_sr_export=sr_salida)
             
-            self.root.after(0, lambda: messagebox.showinfo("Éxito", "Filtro FIR compilado."))
+            # 4. Escritura en disco (PCM 24-bit) con el remuestreo acústico exacto
+            self.motor.exportar_ir(vector_ir, ruta_guardado, target_sr_export=sr_salida)
+
+            # 5. Notificación de éxito retornada al hilo principal
+            self.root.after(0, lambda: messagebox.showinfo(
+                "Síntesis Exitosa", 
+                f"Matriz FIR compilada para el ecosistema seleccionado.\n\n"
+                f"Longitud: {muestras} muestras\n"
+                f"Frecuencia Reloj: {sr_salida} Hz\n"
+                f"Destino: {ruta_guardado}"
+            ))
+        
         except Exception as e:
-            self.root.after(0, lambda: messagebox.showerror("Colapso", str(e)))
+            self.root.after(0, lambda: messagebox.showerror("Colapso en Síntesis", str(e)))
         finally:
             self.root.after(0, lambda: self.btn_exportar.config(text="Sintetizar Filtro FIR", state=tk.NORMAL))
+
+    def actualizar_progreso(self, valor):
+        """Actualiza el vector de la barra y el porcentaje numérico de forma asíncrona."""
+        self.barra_progreso['value'] = valor
+        self.lbl_porcentaje.config(text=f"{int(valor)}%")
 
     def aislar_hilo_busqueda_nam(self):
         if not hasattr(self, 'ruta_objetivo_nam') or not hasattr(self, 'ruta_directorio_nam'):
             messagebox.showerror("Error", "Faltan variables.")
             return
+        
         self.btn_buscar_nam.config(text="Escaneando... (Espere)", state=tk.DISABLED)
-        self.lbl_resultado_nam.config(text="Analizando entropía...")
+        self.lbl_resultado_nam.config(text="Calculando producto cartesiano...")
+        
+        # Reseteo del vector antes del nuevo cálculo
+        self.barra_progreso['value'] = 0
+        self.lbl_porcentaje.config(text="0%")
+        
         threading.Thread(target=self.ejecutar_busqueda_dsp).start()
 
     def ejecutar_busqueda_dsp(self):
@@ -289,11 +400,16 @@ class OptimizadorGUI:
                 banco_irs["Bypass_Directo"] = np.array([1.0])
 
             menor_mse = float('inf')
-            mejor_combinacion, psd_ganador = None, None
+            amp_ganador = None
+            ir_ganador = None
+            psd_ganador = None
+            
+            # Constantes algebraicas para el progreso
+            total_iteraciones = len(archivos_nam) * len(banco_irs)
+            iteracion_actual = 0
 
             for nombre_nam in archivos_nam:
                 try:
-                    self.root.after(0, lambda n=nombre_nam: self.lbl_resultado_nam.config(text=f"Infiriendo: {n}"))
                     senal_amp = self.motor.inferencia_neuronal_nam(os.path.join(self.ruta_directorio_nam, nombre_nam), senal_di)
 
                     for nombre_ir, vector_ir in banco_irs.items():
@@ -303,30 +419,112 @@ class OptimizadorGUI:
 
                         if mse_actual < menor_mse:
                             menor_mse = mse_actual
-                            mejor_combinacion = f"{nombre_nam} + {nombre_ir}" if nombre_ir != "Bypass_Directo" else nombre_nam
+                            amp_ganador = nombre_nam
+                            ir_ganador = nombre_ir
                             psd_ganador = psd_test
-                except Exception as e:
-                    print(f"Error en {nombre_nam}: {e}")
 
-            if mejor_combinacion:
+                        # Desplazamiento del límite vectorial y renderizado asíncrono
+                        iteracion_actual += 1
+                        progreso = (iteracion_actual / total_iteraciones) * 100
+                        self.root.after(0, lambda p=progreso: self.actualizar_progreso(p))
+                        
+                except Exception as e:
+                    print(f"Error procesando el tensor {nombre_nam}: {e}")
+
+            if amp_ganador:
                 nivel = self.var_tolerancia.get()
                 umbral = 5.0 if "Perfección" in nivel else 15.0 if "Aceptable" in nivel else 30.0
                 if menor_mse <= umbral:
-                    self.root.after(0, lambda: self.lbl_resultado_nam.config(text=f"ÓPTIMO: {mejor_combinacion}\nMSE: {menor_mse:.2f}", foreground="green"))
+                    # Formateo estricto del veredicto final
+                    texto_final = f"Amplificador (.nam): {amp_ganador}\nIR: {ir_ganador}"
+                    # Color Cyan Neón para mantener el Dark Studio Mode
+                    self.root.after(0, lambda: self.lbl_resultado_nam.config(text=texto_final, foreground="#00ffcc"))
                     self.root.after(0, self.renderizar_espectro, freqs_obj, psd_obj, freqs_obj, psd_ganador)
                 else:
-                    self.root.after(0, lambda: self.lbl_resultado_nam.config(text=f"Rechazado. Mínimo ({menor_mse:.2f}) supera tolerancia.", foreground="red"))
+                    texto_fallo = f"Rechazado. MSE: {menor_mse:.2f}\nSupera el umbral topológico."
+                    self.root.after(0, lambda: self.lbl_resultado_nam.config(text=texto_fallo, foreground="red"))
             else:
                 self.root.after(0, lambda: self.lbl_resultado_nam.config(text="Fallo: Matriz vacía.", foreground="red"))
         except Exception as e:
-            self.root.after(0, lambda: messagebox.showerror("Colapso", str(e)))
+            self.root.after(0, lambda: messagebox.showerror("Colapso Analítico", str(e)))
         finally:
             self.root.after(0, lambda: self.btn_buscar_nam.config(text="Ejecutar Matriz Combinatoria", state=tk.NORMAL))
+    def construir_firma_ingenieria(self):
+        """
+        Construye el bloque inferior de la interfaz, alojando los controles 
+        globales a la izquierda y el branding minimalista a la derecha.
+        """
+        frame_branding = ttk.Frame(self.root)
+        frame_branding.pack(side=tk.BOTTOM, fill=tk.X, padx=20, pady=10)
+
+        # --- SECCIÓN IZQUIERDA: Controles Globales ---
+        self.btn_limpiar = ttk.Button(frame_branding, text="Limpiar Entorno", width=15, command=self.limpiar_entorno)
+        self.btn_limpiar.pack(side=tk.LEFT, padx=(0, 10))
+
+        self.btn_salir = ttk.Button(frame_branding, text="Salir", width=10, command=self.salir_aplicacion)
+        self.btn_salir.pack(side=tk.LEFT)
+
+        # --- SECCIÓN DERECHA: Firma y Logo ---
+        lbl_texto = ttk.Label(frame_branding, text="Max G.  |  The Guitar Notebook", style='Branding.TLabel')
+        lbl_texto.pack(side=tk.RIGHT, pady=5)
+
+        try:
+            img = Image.open("logo_tgn.png")
+            img = img.resize((35, 35), Image.Resampling.LANCZOS)
+            self.logo_renderizado = ImageTk.PhotoImage(img)
+
+            lbl_logo = ttk.Label(frame_branding, image=self.logo_renderizado)
+            lbl_logo.pack(side=tk.RIGHT, padx=10)
+        except Exception:
+            pass
+
+    def limpiar_entorno(self):
+        """
+        Purga las variables de estado, restaura la geometría 
+        y limpia la matriz visual para un nuevo análisis.
+        """
+        # 1. Purga de tensores en RAM
+        atributos_estado = [
+            'ruta_objetivo', 'ruta_fuente', 
+            'ruta_objetivo_nam', 'ruta_di_nam', 
+            'ruta_directorio_nam', 'ruta_directorio_ir'
+        ]
+        for attr in atributos_estado:
+            if hasattr(self, attr):
+                delattr(self, attr)
+        
+        # 2. Restauración del estado visual (Rama A)
+        self.btn_cargar_obj_nam.config(text="1. Tono Objetivo (.wav)")
+        self.btn_cargar_di_nam.config(text="2. Tono DI Limpio (.wav)")
+        self.btn_cargar_dir_nam.config(text="3. Carpeta Cabezales (.nam)")
+        self.btn_cargar_dir_ir.config(text="4. Carpeta Gabinetes IR (.wav)")
+        
+        # Uso estricto de la tipografía asignada para mantener la coherencia
+        self.lbl_resultado_nam.config(text="Estado: Esperando tensores...", foreground="") 
+        
+        # 3. Restauración del estado visual (Rama B)
+        self.btn_cargar_obj.config(text="1. Inyectar Tono Objetivo (.wav)")
+        self.btn_cargar_fnt.config(text="2. Inyectar Tono Grabado (.wav)")
+        
+        # 4. Colapso del Lienzo Espectral y contracción geométrica
+        self.frame_grafica.pack_forget()
+        self.ax.clear()
+        self.root.geometry("1000x420")       
+        # 5. Purga de la Matriz de Progreso
+        self.barra_progreso['value'] = 0
+        self.lbl_porcentaje.config(text="0%") 
 
 if __name__ == "__main__":
     raiz = tk.Tk()
+    
     style = ttk.Style()
     if 'aqua' in style.theme_names():
         style.theme_use('aqua') 
+    
+    style.configure('.', font=('SF Pro Display', 13))
+    style.configure('TButton', font=('SF Pro Display', 13))
+    style.configure('TLabelframe.Label', font=('SF Pro Display', 14, 'bold'))
+    style.configure('Branding.TLabel', font=('SF Pro Display', 11), foreground='#888888')
+        
     app = OptimizadorGUI(raiz)
     raiz.mainloop()
