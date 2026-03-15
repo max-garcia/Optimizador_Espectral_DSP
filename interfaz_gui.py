@@ -172,7 +172,7 @@ class OptimizadorGUI:
 
     def mostrar_creditos(self):
         texto = (
-            "TGN Tone Architect v1.2\n\n"
+            "TGN Tone Architect v1.3\n\n"
             "Motor de análisis acústico y Tone Match basado en LTI/NAM.\n"
             "Desarrollado para la evaluación determinista de hardware.\n\n"
             "Diseño de Sonido y Código: Max - The Guitar Notebook"
@@ -180,7 +180,7 @@ class OptimizadorGUI:
         messagebox.showinfo("Acerca del Sistema", texto)
 
     def verificar_actualizacion(self):
-        version_local = "v1.2" 
+        version_local = "v1.3" 
         url_api = "https://api.github.com/repos/max-garcia/Optimizador_Espectral_DSP/releases/latest"
         
         try:
