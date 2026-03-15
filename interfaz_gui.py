@@ -3,11 +3,12 @@ import os
 import sys
 from tkinter import filedialog, messagebox
 from tkinter import ttk
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import threading
 import requests
 from PIL import Image, ImageTk
+import urllib.request
+import subprocess
+import time
 
 # Importación estricta del núcleo matemático
 from motor_dsp import MotorTonalDSP
@@ -26,7 +27,9 @@ class OptimizadorGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("TGN Tone Architect - The Guitar Notebook")
-        self.root.geometry("1000x420")
+        
+        # Expansión geométrica inicial
+        self.root.geometry("1000x650") 
         
         # Instancia del núcleo matemático y criptográfico
         self.motor = MotorTonalDSP()
@@ -48,16 +51,18 @@ class OptimizadorGUI:
         # Variable de estado
         self.modo_escaneo = tk.StringVar(value="IR")
 
+        # Inicialización del contenedor del lienzo
+        self.frame_grafico = None
+
         # 3. CONSTRUCCIÓN DE RAMAS Y LIENZO
         self.construir_rama_nam()
         self.construir_rama_hardware()
         self.construir_lienzo_espectral()
 
         # 4. INYECCIÓN DE LA FIRMA (Anclaje Inferior Absoluto)
-        self.construir_firma_ingenieria()   
+        self.construir_firma_ingenieria()
 
     def construir_barra_menu(self):
-        """Construye una barra de menú local forzada dentro de la ventana principal."""
         self.frame_menu_local = ttk.Frame(self.root, relief=tk.RAISED, borderwidth=1)
         self.frame_menu_local.pack(side=tk.TOP, fill=tk.X)
 
@@ -73,7 +78,6 @@ class OptimizadorGUI:
         self.btn_menu_sistema["menu"] = self.menu_desplegable
 
     def construir_rama_nam(self):
-        """Renderiza la Rama A con anclaje de fluidos y barra de progreso escalar."""
         self.frame_master_nam = ttk.Frame(self.tab_nam)
         self.frame_master_nam.pack(expand=True, fill=tk.BOTH)
 
@@ -101,14 +105,12 @@ class OptimizadorGUI:
         self.btn_buscar_nam = ttk.Button(frame_controles_nam, text="Ejecutar Matriz Combinatoria", width=40, command=self.aislar_hilo_busqueda_nam)
         self.btn_buscar_nam.grid(row=3, column=0, columnspan=2, pady=10)
 
-        # Matriz de Progreso (Vector Horizontal)
         self.frame_progreso = ttk.Frame(frame_controles_nam)
         self.frame_progreso.grid(row=4, column=0, columnspan=2, pady=5, sticky=tk.EW)
         
         self.barra_progreso = ttk.Progressbar(self.frame_progreso, orient="horizontal", mode="determinate")
         self.barra_progreso.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(15, 5))
         
-        # Tipografía matemática estricta para el vector numérico
         self.lbl_porcentaje = ttk.Label(self.frame_progreso, text="0%", font=('Times New Roman', 12, 'bold'))
         self.lbl_porcentaje.pack(side=tk.RIGHT, padx=(0, 15))
 
@@ -116,7 +118,6 @@ class OptimizadorGUI:
         self.lbl_resultado_nam.grid(row=5, column=0, columnspan=2, pady=5)
 
     def construir_rama_hardware(self):
-        """Renderiza la Rama B con anclaje dinámico."""
         self.frame_master_hw = ttk.Frame(self.tab_hardware)
         self.frame_master_hw.pack(expand=True, fill=tk.BOTH)
 
@@ -156,7 +157,9 @@ class OptimizadorGUI:
         self.btn_exportar.pack(side=tk.LEFT, padx=10)
 
     def construir_lienzo_espectral(self):
-        """Construye el lienzo en memoria con estética Dark Studio Mode."""
+        from matplotlib.figure import Figure
+        from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+        
         self.frame_grafica = ttk.LabelFrame(self.root, text="Matriz de Densidad Espectral de Potencia")
         self.color_fondo = '#1A1A1C'
         
@@ -169,7 +172,7 @@ class OptimizadorGUI:
 
     def mostrar_creditos(self):
         texto = (
-            "TGN Tone Architect v1.1\n\n"
+            "TGN Tone Architect v1.2\n\n"
             "Motor de análisis acústico y Tone Match basado en LTI/NAM.\n"
             "Desarrollado para la evaluación determinista de hardware.\n\n"
             "Diseño de Sonido y Código: Max - The Guitar Notebook"
@@ -177,21 +180,109 @@ class OptimizadorGUI:
         messagebox.showinfo("Acerca del Sistema", texto)
 
     def verificar_actualizacion(self):
-        version_local = "v1.1"
+        version_local = "v1.2" 
         url_api = "https://api.github.com/repos/max-garcia/Optimizador_Espectral_DSP/releases/latest"
+        
         try:
             respuesta = requests.get(url_api, timeout=5)
             if respuesta.status_code == 200:
                 datos = respuesta.json()
                 version_remota = datos.get("tag_name", "Desconocida")
-                if version_remota != version_local:
-                    messagebox.showinfo("Actualización", f"Versión actual: {version_local}\nNueva versión: {version_remota}\nEjecute 'git pull'.")
+                
+                if version_remota != version_local and version_remota != "Desconocida":
+                    activos = datos.get("assets", [])
+                    url_descarga_dmg = None
+                    for activo in activos:
+                        if activo.get("name", "").endswith(".dmg"):
+                            url_descarga_dmg = activo.get("browser_download_url")
+                            break
+                            
+                    if not url_descarga_dmg:
+                        messagebox.showerror("Error de Paquete", "La nueva versión existe, pero no se encontró un archivo .dmg compilado en el servidor.")
+                        return
+
+                    mensaje = (
+                        f"Actualización Crítica Disponible: {version_remota}\n\n"
+                        f"El sistema descargará el paquete acústico y sobrescribirá "
+                        f"la arquitectura actual.\n\n"
+                        f"¿Desea iniciar la inyección de código ahora?"
+                    )
+                    
+                    if messagebox.askyesno("Sincronización de Sistema", mensaje):
+                        self.ejecutar_auto_updater(url_descarga_dmg, version_remota)
                 else:
                     messagebox.showinfo("Estado", "El software está en su última versión matemática.")
             else:
-                messagebox.showerror("Error HTTP", f"Código inesperado: {respuesta.status_code}")
+                messagebox.showerror("Error HTTP", f"El servidor rechazó la conexión. Código: {respuesta.status_code}")
         except requests.exceptions.RequestException as e:
-            messagebox.showerror("Colapso", f"Fallo de conexión: {e}")
+            messagebox.showerror("Colapso de Red", f"Fallo al contactar el servidor:\n{e}")
+
+    def ejecutar_auto_updater(self, url_dmg, nueva_version):
+        ventana_act = tk.Toplevel(self.root)
+        ventana_act.title("Actualizando TGN Tone Architect")
+        ventana_act.geometry("450x150")
+        ventana_act.resizable(False, False)
+        
+        lbl_info = ttk.Label(ventana_act, text=f"Descargando versión {nueva_version}...", font=('SF Pro Display', 12, 'bold'))
+        lbl_info.pack(pady=(20, 10))
+        
+        barra_progreso = ttk.Progressbar(ventana_act, orient="horizontal", mode="determinate", length=350)
+        barra_progreso.pack(pady=5)
+        
+        lbl_porcentaje = ttk.Label(ventana_act, text="0%", font=('Times New Roman', 12))
+        lbl_porcentaje.pack()
+
+        ventana_act.update()
+
+        def repote_descarga(bloque_num, tamano_bloque, tamano_total):
+            descargado = bloque_num * tamano_bloque
+            if tamano_total > 0:
+                porcentaje = min(100, int((descargado / tamano_total) * 100))
+                barra_progreso['value'] = porcentaje
+                lbl_porcentaje.config(text=f"{porcentaje}%")
+                ventana_act.update_idletasks()
+
+        ruta_dmg_temp = "/tmp/TGN_Update.dmg"
+        ruta_script_sh = "/tmp/tgn_updater.sh"
+        
+        if getattr(sys, 'frozen', False):
+            ruta_app_actual = os.path.abspath(os.path.join(os.path.dirname(sys.executable), "../../.."))
+        else:
+            ruta_app_actual = os.path.abspath(os.path.dirname(__file__))
+
+        def hilo_descarga_y_ejecucion():
+            try:
+                urllib.request.urlretrieve(url_dmg, ruta_dmg_temp, repote_descarga)
+                lbl_info.config(text="Desacoplando y sobrescribiendo binarios...")
+                ventana_act.update()
+                
+                if getattr(sys, 'frozen', False):
+                    script_bash = f"""#!/bin/bash
+                    sleep 2
+                    hdiutil attach "{ruta_dmg_temp}" -mountpoint /Volumes/TGN_Update -nobrowse
+                    rm -rf "{ruta_app_actual}"
+                    cp -R /Volumes/TGN_Update/*.app "{ruta_app_actual}"
+                    hdiutil detach /Volumes/TGN_Update -force
+                    rm "{ruta_dmg_temp}"
+                    rm "{ruta_script_sh}"
+                    open "{ruta_app_actual}"
+                    """
+                    
+                    with open(ruta_script_sh, "w") as f:
+                        f.write(script_bash)
+                    os.chmod(ruta_script_sh, 0o755)
+                    
+                    subprocess.Popen(['/bin/bash', ruta_script_sh], start_new_session=True)
+                    os._exit(0)
+                else:
+                    messagebox.showinfo("Entorno de Desarrollo", "Descarga completada en /tmp/. La sobrescritura automática solo opera sobre el binario compilado (.app).", parent=ventana_act)
+                    ventana_act.destroy()
+
+            except Exception as e:
+                messagebox.showerror("Colapso Topológico", f"Fallo en la síntesis de actualización:\n{e}", parent=ventana_act)
+                ventana_act.destroy()
+
+        threading.Thread(target=hilo_descarga_y_ejecucion).start()
 
     def salir_aplicacion(self):
         if messagebox.askokcancel("Cierre", "¿Confirma la finalización de los procesos?"):
@@ -199,20 +290,56 @@ class OptimizadorGUI:
             self.root.destroy()    
 
     def cargar_archivo(self, tipo):
-        ruta = filedialog.askopenfilename(title=f"Seleccionar Tono {tipo}", filetypes=[("Archivos de Audio", "*.wav")])
-        if ruta:
-            if tipo == "Objetivo":
-                self.ruta_objetivo = ruta
-                self.btn_cargar_obj.config(text="1. Tono Objetivo Inyectado ✓")
-            elif tipo == "Fuente":
-                self.ruta_fuente = ruta
-                self.btn_cargar_fnt.config(text="2. Tono Grabado Inyectado ✓")
-            elif tipo == "Objetivo_NAM":
-                self.ruta_objetivo_nam = ruta
-                self.btn_cargar_obj_nam.config(text="1. Objetivo Inyectado ✓")
-            elif tipo == "DI_NAM": 
-                self.ruta_di_nam = ruta
-                self.btn_cargar_di_nam.config(text="2. DI Limpio Inyectado ✓")
+        if tipo == "Objetivo_NAM" or tipo == "Objetivo":
+            titulo = "Axioma Topológico: Tono Objetivo"
+            mensaje = (
+                "Para que el trabajo sea preciso, el archivo debe cumplir estas condiciones:\n\n"
+                "• Formato: .wav (16 o 24 bits).\n"
+                "• Contenido: El Stem (pista aislada) de la guitarra del disco o referencia.\n"
+                "• Condición Crítica: Procure extraer el audio de una sección con mínima interferencia "
+                "(sin colisión severa con platillos o voz) para reducir la pérdida de fase y artefactos."
+            )
+        elif tipo == "DI_NAM":
+            titulo = "ADVERTENCIA ACÚSTICA: Tono DI Limpio"
+            mensaje = (
+                "El Tono DI debe ser la señal eléctrica virgen para evitar el colapso de la red neuronal.\n\n"
+                "• Formato: .wav (16 o 24 bits).\n"
+                "• Condición Crítica: Grabado directamente de la entrada Hi-Z (Instrumento) de su interfaz.\n\n"
+                "PROHIBICIONES ESTRICTAS:\n"
+                "✕ Ningún amplificador físico o virtual (Plugin).\n"
+                "✕ Ningún gabinete (IR) o simulación de altavoz.\n"
+                "✕ Ningún pedal, compresión o ecualización en el DAW."
+            )
+        elif tipo == "Fuente":
+            titulo = "ADVERTENCIA ACÚSTICA: Tono Hardware (Grabado)"
+            mensaje = (
+                "Para aislar la respuesta lineal del filtro FIR, la señal debe contener "
+                "únicamente la distorsión del preamplificador.\n\n"
+                "• Formato: .wav (16 o 24 bits).\n"
+                "• Condición Crítica: El bloque de Gabinete (Cab) o IR en su pedalera debe estar ESTRICTAMENTE APAGADO.\n"
+                "• Ajuste Previo: Iguale auditivamente la cantidad de ganancia/distorsión de su equipo "
+                "con la distorsión del Tono Objetivo antes de grabar."
+            )
+        else:
+            return
+
+        confirmacion = messagebox.askokcancel(titulo, mensaje)
+        
+        if confirmacion:
+            ruta = filedialog.askopenfilename(title=f"Seleccionar Tono {tipo}", filetypes=[("Archivos de Audio", "*.wav")])
+            if ruta:
+                if tipo == "Objetivo":
+                    self.ruta_objetivo = ruta
+                    self.btn_cargar_obj.config(text="1. Tono Objetivo Inyectado ✓")
+                elif tipo == "Fuente":
+                    self.ruta_fuente = ruta
+                    self.btn_cargar_fnt.config(text="2. Tono Grabado Inyectado ✓")
+                elif tipo == "Objetivo_NAM":
+                    self.ruta_objetivo_nam = ruta
+                    self.btn_cargar_obj_nam.config(text="1. Objetivo Inyectado ✓")
+                elif tipo == "DI_NAM": 
+                    self.ruta_di_nam = ruta
+                    self.btn_cargar_di_nam.config(text="2. DI Limpio Inyectado ✓")
 
     def seleccionar_directorio_nam(self):
         ruta_dir = filedialog.askdirectory(title="Seleccionar Carpeta de Búsqueda")
@@ -230,22 +357,36 @@ class OptimizadorGUI:
         if not hasattr(self, 'ruta_objetivo') or not hasattr(self, 'ruta_fuente'):
             messagebox.showerror("Error Topológico", "Faltan variables en la ecuación.")
             return
-        self.btn_analizar.config(text="Procesando...", state=tk.DISABLED)
+        self.btn_analizar.config(text="Calculando LTI...", state=tk.DISABLED)
         threading.Thread(target=self.ejecutar_matematica_dsp).start()
 
     def ejecutar_matematica_dsp(self):
         try:
-            senal_obj, _ = self.motor.cargar_audio(self.ruta_objetivo)
+            # 1. Extracción en memoria
+            senal_obj, fs = self.motor.cargar_audio(self.ruta_objetivo)
             senal_fnt, _ = self.motor.cargar_audio(self.ruta_fuente)
+            
+            senal_obj_sync, senal_fnt_sync = self.motor.alinear_fase_correlacion(senal_obj, senal_fnt)
+            
+            # 2. Alineación de Energía RMS
+            senal_fnt_alineada = self.motor.alinear_energia_rms(senal_obj, senal_fnt)
+            
+            # 3. Cálculo de Densidad Espectral (Welch lineal)
             freqs_obj, psd_obj = self.motor.calcular_psd_welch(senal_obj)
-            freqs_fnt, psd_fnt = self.motor.calcular_psd_welch(senal_fnt)
+            freqs_fnt, psd_fnt = self.motor.calcular_psd_welch(senal_fnt_alineada)
+            
+            # 4. Inyección del render al hilo principal
             self.root.after(0, self.renderizar_espectro, freqs_obj, psd_obj, freqs_fnt, psd_fnt)
+            
         except Exception as e:
-            self.root.after(0, lambda: messagebox.showerror("Colapso", str(e)))
-            self.root.after(0, lambda: self.btn_analizar.config(text="Calcular Ecuación", state=tk.NORMAL))
+            self.root.after(0, lambda: messagebox.showerror("Colapso Analítico", str(e)))
+            self.root.after(0, lambda: self.btn_analizar.config(text="Calcular Ecuación Espectral", state=tk.NORMAL))
 
     def renderizar_espectro(self, f_obj, p_obj, f_fnt, p_fnt):
-        """Dibuja los tensores acústicos aplicando un alto contraste geométrico."""
+        """Dibuja los tensores acústicos previniendo eclipses visuales."""
+        import numpy as np
+        import matplotlib.pyplot as plt
+        
         self.root.geometry("1000x950")
         self.frame_grafica.pack(fill=tk.BOTH, expand=True, padx=15, pady=10)
         
@@ -253,15 +394,16 @@ class OptimizadorGUI:
         
         color_texto = '#E0E0E0'
         color_rejilla = '#333333'
-        
         self.ax.set_facecolor(self.color_fondo)
         
-        fuente_titulo = {'family': 'sans-serif', 'color': color_texto, 'size': 13, 'weight': 'bold'}
-        fuente_ejes = {'family': 'sans-serif', 'color': color_texto, 'size': 11}
+        # Asignación tipográfica estricta
+        plt.rcParams['font.family'] = 'SF Pro Display'
+        fuente_titulo = {'color': color_texto, 'size': 13, 'weight': 'bold'}
+        fuente_ejes = {'color': color_texto, 'size': 11}
         
         self.ax.set_title("Dominio de la Frecuencia (Resolución Acústica)", fontdict=fuente_titulo, pad=15)
         self.ax.set_xlabel("Frecuencia (Hz) - Escala Logarítmica", fontdict=fuente_ejes)
-        self.ax.set_ylabel("Magnitud (dB)", fontdict=fuente_ejes)
+        self.ax.set_ylabel("Densidad Espectral (dB)", fontdict=fuente_ejes)
         self.ax.set_xscale('log')
         self.ax.set_xlim([20, 20000])
         
@@ -272,14 +414,37 @@ class OptimizadorGUI:
             spine.set_color(color_rejilla)
             spine.set_linewidth(1)
             
-        self.ax.tick_params(axis='both', colors=color_texto, labelsize=10)
+        # Tipografía matemática estricta para tensores numéricos
+        for label in self.ax.get_xticklabels() + self.ax.get_yticklabels():
+            label.set_fontname('Times New Roman')
+            label.set_color(color_texto)
+            label.set_fontsize(10)
         
-        self.ax.plot(f_obj, p_obj, label="Tono Objetivo (Disco)", color='#00ffcc', alpha=0.85, linewidth=1.8)
-        self.ax.plot(f_fnt, p_fnt, label="Tono Analizado (Hardware)", color='#ff00ff', alpha=0.85, linewidth=1.8)
+        # 1. Purga y Conversión Logarítmica (El motor envía datos lineales)
+        p_obj = np.nan_to_num(p_obj, nan=1e-12, posinf=1e-12, neginf=1e-12)
+        p_fnt = np.nan_to_num(p_fnt, nan=1e-12, posinf=1e-12, neginf=1e-12)
         
+        p_obj_db = 10 * np.log10(np.maximum(p_obj, 1e-12))
+        p_fnt_db = 10 * np.log10(np.maximum(p_fnt, 1e-12))
+        
+        # 2. Definición de límites del eje Y evaluando ambas curvas
+        techo = max(np.max(p_obj_db), np.max(p_fnt_db))
+        self.ax.set_ylim([techo - 80, techo + 10]) 
+
+        # 3. Dibujo de tensores
+        self.ax.plot(f_obj, p_obj_db, label="Tono Objetivo (Disco)", 
+                     color='#00ffcc', alpha=1.0, linewidth=2.5)
+        
+        self.ax.plot(f_fnt, p_fnt_db, label="Tono Analizado (Hardware)", 
+                     color='#ff00ff', alpha=0.9, linewidth=1.5, linestyle='--')
+        
+        # 4. Creación e iteración de la Leyenda
         leyenda = self.ax.legend(facecolor=self.color_fondo, edgecolor=color_rejilla, fontsize=10)
-        for texto_leyenda in leyenda.get_texts():
-            texto_leyenda.set_color(color_texto)
+        
+        if leyenda: 
+            for texto_leyenda in leyenda.get_texts():
+                texto_leyenda.set_color(color_texto)
+                texto_leyenda.set_fontname('SF Pro Display')
             
         self.figura.tight_layout() 
         self.canvas.draw()
@@ -296,7 +461,6 @@ class OptimizadorGUI:
             serial_fisico = self.seguridad.extraer_hardware_serial()
             hash_esperado = self.seguridad.generar_llave_maestra(serial_fisico)
             
-            # 1. Cálculo del vector absoluto del directorio de ejecución
             if getattr(sys, 'frozen', False):
                 directorio_base = os.path.dirname(sys.executable)
                 if sys.platform == "darwin" and ".app/Contents/MacOS" in directorio_base:
@@ -304,11 +468,9 @@ class OptimizadorGUI:
             else:
                 directorio_base = os.path.abspath(os.path.dirname(__file__))
 
-            # 2. Evaluación de la compuerta criptográfica con ruta absoluta
             ruta_licencia = os.path.join(directorio_base, "licencia.key")
 
             if not os.path.exists(ruta_licencia):
-                # Desvío al Modal Comercial
                 self.root.after(0, lambda: self.mostrar_ventana_activacion(directorio_base))
                 return 
                 
@@ -321,7 +483,6 @@ class OptimizadorGUI:
             messagebox.showerror("Seguridad", f"Colapso en lectura de hardware: {e}")
             return
 
-        # 3. Flujo normal de guardado
         ruta_guardado = filedialog.asksaveasfilename(defaultextension=".wav", filetypes=[("WAV", "*.wav")])
         if not ruta_guardado:
             return
@@ -346,10 +507,13 @@ class OptimizadorGUI:
             senal_obj, _ = self.motor.cargar_audio(self.ruta_objetivo)
             senal_fnt, _ = self.motor.cargar_audio(self.ruta_fuente)
             
-            _, psd_obj = self.motor.calcular_psd_welch(senal_obj)
-            _, psd_fnt = self.motor.calcular_psd_welch(senal_fnt)
+            senal_fnt_alineada = self.motor.alinear_energia_rms(senal_obj, senal_fnt)
 
-            vector_ir = self.motor.sintetizar_filtro_fir(psd_obj, psd_fnt, muestras_salida=muestras)
+            _, psd_obj = self.motor.calcular_psd_welch(senal_obj)
+            _, psd_fnt = self.motor.calcular_psd_welch(senal_fnt_alineada)
+
+            # Modifica la llamada al filtro FIR para incluir las frecuencias:
+            vector_ir = self.motor.sintetizar_filtro_fir(freqs_obj, psd_obj, psd_fnt, muestras_salida=muestras)
             self.motor.exportar_ir(vector_ir, ruta_guardado, target_sr_export=sr_salida)
 
             self.root.after(0, lambda: messagebox.showinfo(
@@ -371,7 +535,36 @@ class OptimizadorGUI:
 
     def aislar_hilo_busqueda_nam(self):
         if not hasattr(self, 'ruta_objetivo_nam') or not hasattr(self, 'ruta_directorio_nam'):
-            messagebox.showerror("Error", "Faltan variables.")
+            messagebox.showerror("Error Topológico", "Faltan variables en la ecuación. Inyecte los tensores requeridos.")
+            return
+
+        try:
+            import sys
+            import os
+            
+            serial_fisico = self.seguridad.extraer_hardware_serial()
+            hash_esperado = self.seguridad.generar_llave_maestra(serial_fisico)
+            
+            if getattr(sys, 'frozen', False):
+                directorio_base = os.path.dirname(sys.executable)
+                if sys.platform == "darwin" and ".app/Contents/MacOS" in directorio_base:
+                    directorio_base = os.path.abspath(os.path.join(directorio_base, "../../.."))
+            else:
+                directorio_base = os.path.abspath(os.path.dirname(__file__))
+
+            ruta_licencia = os.path.join(directorio_base, "licencia.key")
+
+            if not os.path.exists(ruta_licencia):
+                self.root.after(0, lambda: self.mostrar_ventana_activacion(directorio_base))
+                return 
+                
+            with open(ruta_licencia, "r") as archivo:
+                if archivo.read().strip() != hash_esperado:
+                    messagebox.showerror("Seguridad", "Firma criptográfica inválida para esta matriz de silicio.")
+                    return
+                    
+        except Exception as e:
+            messagebox.showerror("Seguridad", f"Colapso en lectura de hardware:\n{e}")
             return
         
         self.btn_buscar_nam.config(text="Escaneando... (Espere)", state=tk.DISABLED)
@@ -383,6 +576,10 @@ class OptimizadorGUI:
         threading.Thread(target=self.ejecutar_busqueda_dsp).start()
 
     def ejecutar_busqueda_dsp(self):
+        import numpy as np
+        import os
+        import threading
+        
         try:
             senal_obj, _ = self.motor.cargar_audio(self.ruta_objetivo_nam)
             freqs_obj, psd_obj = self.motor.calcular_psd_welch(senal_obj)
@@ -395,7 +592,6 @@ class OptimizadorGUI:
                 for arch_ir in [f for f in os.listdir(self.ruta_directorio_ir) if f.endswith('.wav')]:
                     banco_irs[arch_ir] = self.motor.cargar_ir_referencia(os.path.join(self.ruta_directorio_ir, arch_ir))
             else:
-                import numpy as np
                 banco_irs["Bypass_Directo"] = np.array([1.0])
 
             menor_mse = float('inf')
@@ -410,27 +606,41 @@ class OptimizadorGUI:
                 try:
                     senal_amp = self.motor.inferencia_neuronal_nam(os.path.join(self.ruta_directorio_nam, nombre_nam), senal_di)
 
+                    if senal_amp is None or np.max(np.abs(senal_amp)) < 1e-6 or np.isnan(senal_amp).any():
+                        print(f"Axioma fallido: El tensor {nombre_nam} generó silencio absoluto. Descartado.")
+                        iteracion_actual += len(banco_irs)
+                        continue
+
                     for nombre_ir, vector_ir in banco_irs.items():
                         senal_final = senal_amp if nombre_ir == "Bypass_Directo" else self.motor.aplicar_gabinete_referencia(senal_amp, vector_ir)
-                        _, psd_test = self.motor.calcular_psd_welch(senal_final)
+                        
+                        senal_final_alineada = self.motor.alinear_energia_rms(senal_obj, senal_final)
+                        _, psd_test = self.motor.calcular_psd_welch(senal_final_alineada)
+                        
+                        if np.isnan(psd_test).any() or np.max(psd_test) < 1e-12:
+                            iteracion_actual += 1
+                            continue
+                            
                         mse_actual = self.motor.calcular_mse_espectral(psd_obj, psd_test)
 
                         if mse_actual < menor_mse:
                             menor_mse = mse_actual
                             amp_ganador = nombre_nam
                             ir_ganador = nombre_ir
-                            psd_ganador = psd_test
+                            psd_ganador = np.copy(psd_test)
 
                         iteracion_actual += 1
                         progreso = (iteracion_actual / total_iteraciones) * 100
                         self.root.after(0, lambda p=progreso: self.actualizar_progreso(p))
                         
                 except Exception as e:
-                    print(f"Error procesando el tensor {nombre_nam}: {e}")
+                    print(f"Error estructural procesando {nombre_nam}: {e}")
+                    iteracion_actual += len(banco_irs)
 
-            if amp_ganador:
+            if amp_ganador and psd_ganador is not None:
                 nivel = self.var_tolerancia.get()
                 umbral = 5.0 if "Perfección" in nivel else 15.0 if "Aceptable" in nivel else 30.0
+                
                 if menor_mse <= umbral:
                     texto_final = f"Amplificador (.nam): {amp_ganador}\nIR: {ir_ganador}"
                     self.root.after(0, lambda: self.lbl_resultado_nam.config(text=texto_final, foreground="#00ffcc"))
@@ -439,14 +649,14 @@ class OptimizadorGUI:
                     texto_fallo = f"Rechazado. MSE: {menor_mse:.2f}\nSupera el umbral topológico."
                     self.root.after(0, lambda: self.lbl_resultado_nam.config(text=texto_fallo, foreground="red"))
             else:
-                self.root.after(0, lambda: self.lbl_resultado_nam.config(text="Fallo: Matriz vacía.", foreground="red"))
+                self.root.after(0, lambda: self.lbl_resultado_nam.config(text="Fallo: La matriz devolvió tensores vacíos.", foreground="red"))
+                
         except Exception as e:
             self.root.after(0, lambda: messagebox.showerror("Colapso Analítico", str(e)))
         finally:
-            self.root.after(0, lambda: self.btn_buscar_nam.config(text="Ejecutar Matriz Combinatoria", state=tk.NORMAL))
-   
+            self.root.after(0, lambda: self.btn_buscar_nam.config(text="Ejecutar Matriz Combinatoria", state=tk.NORMAL)) 
+
     def construir_firma_ingenieria(self):
-        """Construye el bloque inferior de la interfaz con los controles globales."""
         frame_branding = ttk.Frame(self.root)
         frame_branding.pack(side=tk.BOTTOM, fill=tk.X, padx=20, pady=10)
 
@@ -471,7 +681,6 @@ class OptimizadorGUI:
             print(f"Fallo gráfico: {e}") 
 
     def limpiar_entorno(self):
-        """Purga las variables de estado y limpia la matriz visual."""
         atributos_estado = [
             'ruta_objetivo', 'ruta_fuente', 
             'ruta_objetivo_nam', 'ruta_di_nam', 
@@ -491,15 +700,17 @@ class OptimizadorGUI:
         self.btn_cargar_obj.config(text="1. Inyectar Tono Objetivo (.wav)")
         self.btn_cargar_fnt.config(text="2. Inyectar Tono Grabado (.wav)")
         
-        self.frame_grafica.pack_forget()
-        self.ax.clear()
-        self.root.geometry("1000x420")       
+        if hasattr(self, 'frame_grafica'):
+            self.frame_grafica.pack_forget()
+        if hasattr(self, 'ax'):
+            self.ax.clear()
+            
+        self.root.geometry("1000x650")       
         
         self.barra_progreso['value'] = 0
-        self.lbl_porcentaje.config(text="0%") 
+        self.lbl_porcentaje.config(text="0%")
 
     def mostrar_ventana_activacion(self, directorio_base):
-        """Renderiza la topología de la compuerta comercial para inyectar la llave."""
         ventana_act = tk.Toplevel(self.root)
         ventana_act.title("Activación de Producto - The Guitar Notebook")
         ventana_act.geometry("550x300")
@@ -522,7 +733,6 @@ class OptimizadorGUI:
                                     justify=tk.CENTER, font=('SF Pro Display', 13))
         lbl_instruccion.pack(pady=(0, 15))
 
-        # Hardware ID: Uso estricto de tipografía matemática
         frame_hwid = ttk.Frame(frame_interno)
         frame_hwid.pack(fill=tk.X, pady=5)
         ttk.Label(frame_hwid, text="Hardware ID:", font=('SF Pro Display', 12, 'bold')).pack(side=tk.LEFT)
@@ -532,7 +742,6 @@ class OptimizadorGUI:
         entrada_hwid.insert(0, serial_cliente)
         entrada_hwid.config(state='readonly') 
 
-        # Hash Hexadecimal: Uso estricto de tipografía matemática
         frame_llave = ttk.Frame(frame_interno)
         frame_llave.pack(fill=tk.X, pady=15)
         ttk.Label(frame_llave, text="Llave de Acceso:", font=('SF Pro Display', 12, 'bold')).pack(side=tk.LEFT)
@@ -549,7 +758,7 @@ class OptimizadorGUI:
                 try:
                     with open(ruta_licencia, "w") as archivo:
                         archivo.write(llave_ingresada)
-                    messagebox.showinfo("Éxito", "Criptografía validada. El Optimizador Espectral está completamente operativo.", parent=ventana_act)
+                    messagebox.showinfo("Éxito", "Criptografía validada. El Optimizador Espectral está operativo.", parent=ventana_act)
                     ventana_act.destroy()
                 except Exception as e:
                     messagebox.showerror("Error de E/S", f"No se pudo escribir el archivo: {e}", parent=ventana_act)
@@ -559,6 +768,7 @@ class OptimizadorGUI:
         btn_activar = ttk.Button(frame_interno, text="Activar Software", command=validar_e_inyectar)
         btn_activar.pack(pady=10)
 
+# --- BLOQUE DE EJECUCIÓN PRINCIPAL CONSOLIDADO ---
 if __name__ == "__main__":
     raiz = tk.Tk()
     
