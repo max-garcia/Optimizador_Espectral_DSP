@@ -15,7 +15,6 @@ from motor_dsp import MotorTonalDSP
 from gestor_licencias import CriptografiaHWID  
 
 def resolver_ruta(ruta_relativa):
-    """Calcula el vector absoluto al recurso gráfico, resolviendo el entorno _MEIPASS de PyInstaller."""
     try:
         ruta_base = sys._MEIPASS
     except Exception:
@@ -27,18 +26,13 @@ class OptimizadorGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("TGN Tone Architect - The Guitar Notebook")
-        
-        # Expansión geométrica inicial
         self.root.geometry("1000x650") 
         
-        # Instancia del núcleo matemático y criptográfico
         self.motor = MotorTonalDSP()
         self.seguridad = CriptografiaHWID()
 
-        # 1. INYECCIÓN DEL MENÚ LOCAL (Anclaje Superior Absoluto)
         self.construir_barra_menu()
 
-        # 2. TOPOLOGÍA BIMODAL (Pestañas con expansión de fluidos)
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill=tk.BOTH, expand=True, padx=15, pady=10)
 
@@ -48,18 +42,12 @@ class OptimizadorGUI:
         self.notebook.add(self.tab_nam, text="Rama A: Búsqueda Correlacional (NAM)")
         self.notebook.add(self.tab_hardware, text="Rama B: Síntesis Hardware (Filtros FIR)")
 
-        # Variable de estado
         self.modo_escaneo = tk.StringVar(value="IR")
-
-        # Inicialización del contenedor del lienzo
         self.frame_grafico = None
 
-        # 3. CONSTRUCCIÓN DE RAMAS Y LIENZO
         self.construir_rama_nam()
         self.construir_rama_hardware()
         self.construir_lienzo_espectral()
-
-        # 4. INYECCIÓN DE LA FIRMA (Anclaje Inferior Absoluto)
         self.construir_firma_ingenieria()
 
     def construir_barra_menu(self):
@@ -366,24 +354,24 @@ class OptimizadorGUI:
             senal_obj, fs = self.motor.cargar_audio(self.ruta_objetivo)
             senal_fnt, _ = self.motor.cargar_audio(self.ruta_fuente)
             
+            # 2. Sincronización de Fase Exacta
             senal_obj_sync, senal_fnt_sync = self.motor.alinear_fase_correlacion(senal_obj, senal_fnt)
             
-            # 2. Alineación de Energía RMS
-            senal_fnt_alineada = self.motor.alinear_energia_rms(senal_obj, senal_fnt)
+            # 3. Alineación de Energía RMS
+            senal_fnt_alineada = self.motor.alinear_energia_rms(senal_obj_sync, senal_fnt_sync)
             
-            # 3. Cálculo de Densidad Espectral (Welch lineal)
-            freqs_obj, psd_obj = self.motor.calcular_psd_welch(senal_obj)
+            # 4. Cálculo de Densidad Espectral (Welch lineal)
+            freqs_obj, psd_obj = self.motor.calcular_psd_welch(senal_obj_sync)
             freqs_fnt, psd_fnt = self.motor.calcular_psd_welch(senal_fnt_alineada)
             
-            # 4. Inyección del render al hilo principal
+            # 5. Inyección del render al hilo principal
             self.root.after(0, self.renderizar_espectro, freqs_obj, psd_obj, freqs_fnt, psd_fnt)
             
         except Exception as e:
-            self.root.after(0, lambda: messagebox.showerror("Colapso Analítico", str(e)))
+            self.root.after(0, lambda err=str(e): messagebox.showerror("Colapso Analítico", err))
             self.root.after(0, lambda: self.btn_analizar.config(text="Calcular Ecuación Espectral", state=tk.NORMAL))
 
     def renderizar_espectro(self, f_obj, p_obj, f_fnt, p_fnt):
-        """Dibuja los tensores acústicos previniendo eclipses visuales."""
         import numpy as np
         import matplotlib.pyplot as plt
         
@@ -396,7 +384,6 @@ class OptimizadorGUI:
         color_rejilla = '#333333'
         self.ax.set_facecolor(self.color_fondo)
         
-        # Asignación tipográfica estricta
         plt.rcParams['font.family'] = 'SF Pro Display'
         fuente_titulo = {'color': color_texto, 'size': 13, 'weight': 'bold'}
         fuente_ejes = {'color': color_texto, 'size': 11}
@@ -414,31 +401,26 @@ class OptimizadorGUI:
             spine.set_color(color_rejilla)
             spine.set_linewidth(1)
             
-        # Tipografía matemática estricta para tensores numéricos
         for label in self.ax.get_xticklabels() + self.ax.get_yticklabels():
             label.set_fontname('Times New Roman')
             label.set_color(color_texto)
             label.set_fontsize(10)
         
-        # 1. Purga y Conversión Logarítmica (El motor envía datos lineales)
         p_obj = np.nan_to_num(p_obj, nan=1e-12, posinf=1e-12, neginf=1e-12)
         p_fnt = np.nan_to_num(p_fnt, nan=1e-12, posinf=1e-12, neginf=1e-12)
         
         p_obj_db = 10 * np.log10(np.maximum(p_obj, 1e-12))
         p_fnt_db = 10 * np.log10(np.maximum(p_fnt, 1e-12))
         
-        # 2. Definición de límites del eje Y evaluando ambas curvas
         techo = max(np.max(p_obj_db), np.max(p_fnt_db))
         self.ax.set_ylim([techo - 80, techo + 10]) 
 
-        # 3. Dibujo de tensores
         self.ax.plot(f_obj, p_obj_db, label="Tono Objetivo (Disco)", 
                      color='#00ffcc', alpha=1.0, linewidth=2.5)
         
         self.ax.plot(f_fnt, p_fnt_db, label="Tono Analizado (Hardware)", 
                      color='#ff00ff', alpha=0.9, linewidth=1.5, linestyle='--')
         
-        # 4. Creación e iteración de la Leyenda
         leyenda = self.ax.legend(facecolor=self.color_fondo, edgecolor=color_rejilla, fontsize=10)
         
         if leyenda: 
@@ -504,16 +486,24 @@ class OptimizadorGUI:
                 muestras = 1024
                 sr_salida = 44100
 
+            # 1. Cargar tensores acústicos
             senal_obj, _ = self.motor.cargar_audio(self.ruta_objetivo)
             senal_fnt, _ = self.motor.cargar_audio(self.ruta_fuente)
             
-            senal_fnt_alineada = self.motor.alinear_energia_rms(senal_obj, senal_fnt)
+            # 2. Sincronización de Fase (Correlación Cruzada)
+            senal_obj_sync, senal_fnt_sync = self.motor.alinear_fase_correlacion(senal_obj, senal_fnt)
+            
+            # 3. Alineación de Energía
+            senal_fnt_alineada = self.motor.alinear_energia_rms(senal_obj_sync, senal_fnt_sync)
 
-            _, psd_obj = self.motor.calcular_psd_welch(senal_obj)
+            # 4. Extracción Espectral
+            freqs_obj, psd_obj = self.motor.calcular_psd_welch(senal_obj_sync)
             _, psd_fnt = self.motor.calcular_psd_welch(senal_fnt_alineada)
 
-            # Modifica la llamada al filtro FIR para incluir las frecuencias:
+            # 5. Síntesis LTI (Requiere frecuencias para el suavizado)
             vector_ir = self.motor.sintetizar_filtro_fir(freqs_obj, psd_obj, psd_fnt, muestras_salida=muestras)
+            
+            # 6. Remuestreo y Exportación
             self.motor.exportar_ir(vector_ir, ruta_guardado, target_sr_export=sr_salida)
 
             self.root.after(0, lambda: messagebox.showinfo(
@@ -525,7 +515,7 @@ class OptimizadorGUI:
             ))
         
         except Exception as e:
-            self.root.after(0, lambda: messagebox.showerror("Colapso en Síntesis", str(e)))
+            self.root.after(0, lambda err=str(e): messagebox.showerror("Colapso en Síntesis", err))
         finally:
             self.root.after(0, lambda: self.btn_exportar.config(text="Sintetizar Filtro FIR", state=tk.NORMAL))
 
@@ -582,7 +572,6 @@ class OptimizadorGUI:
         
         try:
             senal_obj, _ = self.motor.cargar_audio(self.ruta_objetivo_nam)
-            freqs_obj, psd_obj = self.motor.calcular_psd_welch(senal_obj)
             senal_di, _ = self.motor.cargar_audio(self.ruta_di_nam)
 
             archivos_nam = [f for f in os.listdir(self.ruta_directorio_nam) if f.endswith('.nam')]
@@ -598,6 +587,7 @@ class OptimizadorGUI:
             amp_ganador = None
             ir_ganador = None
             psd_ganador = None
+            freqs_ganador = None
             
             total_iteraciones = len(archivos_nam) * len(banco_irs)
             iteracion_actual = 0
@@ -607,27 +597,32 @@ class OptimizadorGUI:
                     senal_amp = self.motor.inferencia_neuronal_nam(os.path.join(self.ruta_directorio_nam, nombre_nam), senal_di)
 
                     if senal_amp is None or np.max(np.abs(senal_amp)) < 1e-6 or np.isnan(senal_amp).any():
-                        print(f"Axioma fallido: El tensor {nombre_nam} generó silencio absoluto. Descartado.")
+                        print(f"Axioma fallido: El tensor {nombre_nam} generó silencio absoluto.")
                         iteracion_actual += len(banco_irs)
                         continue
 
                     for nombre_ir, vector_ir in banco_irs.items():
                         senal_final = senal_amp if nombre_ir == "Bypass_Directo" else self.motor.aplicar_gabinete_referencia(senal_amp, vector_ir)
                         
-                        senal_final_alineada = self.motor.alinear_energia_rms(senal_obj, senal_final)
+                        # Inyección estricta de alineación por fase dentro de la matriz combinatoria
+                        senal_obj_sync, senal_final_sync = self.motor.alinear_fase_correlacion(senal_obj, senal_final)
+                        senal_final_alineada = self.motor.alinear_energia_rms(senal_obj_sync, senal_final_sync)
+                        
+                        freqs_obj_sync, psd_obj_sync = self.motor.calcular_psd_welch(senal_obj_sync)
                         _, psd_test = self.motor.calcular_psd_welch(senal_final_alineada)
                         
                         if np.isnan(psd_test).any() or np.max(psd_test) < 1e-12:
                             iteracion_actual += 1
                             continue
                             
-                        mse_actual = self.motor.calcular_mse_espectral(psd_obj, psd_test)
+                        mse_actual = self.motor.calcular_mse_espectral(psd_obj_sync, psd_test)
 
                         if mse_actual < menor_mse:
                             menor_mse = mse_actual
                             amp_ganador = nombre_nam
                             ir_ganador = nombre_ir
                             psd_ganador = np.copy(psd_test)
+                            freqs_ganador = np.copy(freqs_obj_sync)
 
                         iteracion_actual += 1
                         progreso = (iteracion_actual / total_iteraciones) * 100
@@ -644,7 +639,10 @@ class OptimizadorGUI:
                 if menor_mse <= umbral:
                     texto_final = f"Amplificador (.nam): {amp_ganador}\nIR: {ir_ganador}"
                     self.root.after(0, lambda: self.lbl_resultado_nam.config(text=texto_final, foreground="#00ffcc"))
-                    self.root.after(0, self.renderizar_espectro, freqs_obj, psd_obj, freqs_obj, psd_ganador)
+                    
+                    # Extraemos el psd original sincronizado para graficar correctamente
+                    _, psd_obj_render = self.motor.calcular_psd_welch(senal_obj[:len(freqs_ganador)*2]) 
+                    self.root.after(0, self.renderizar_espectro, freqs_ganador, psd_obj_render, freqs_ganador, psd_ganador)
                 else:
                     texto_fallo = f"Rechazado. MSE: {menor_mse:.2f}\nSupera el umbral topológico."
                     self.root.after(0, lambda: self.lbl_resultado_nam.config(text=texto_fallo, foreground="red"))
@@ -652,7 +650,7 @@ class OptimizadorGUI:
                 self.root.after(0, lambda: self.lbl_resultado_nam.config(text="Fallo: La matriz devolvió tensores vacíos.", foreground="red"))
                 
         except Exception as e:
-            self.root.after(0, lambda: messagebox.showerror("Colapso Analítico", str(e)))
+            self.root.after(0, lambda err=str(e): messagebox.showerror("Colapso Analítico", err))
         finally:
             self.root.after(0, lambda: self.btn_buscar_nam.config(text="Ejecutar Matriz Combinatoria", state=tk.NORMAL)) 
 
@@ -768,7 +766,6 @@ class OptimizadorGUI:
         btn_activar = ttk.Button(frame_interno, text="Activar Software", command=validar_e_inyectar)
         btn_activar.pack(pady=10)
 
-# --- BLOQUE DE EJECUCIÓN PRINCIPAL CONSOLIDADO ---
 if __name__ == "__main__":
     raiz = tk.Tk()
     
