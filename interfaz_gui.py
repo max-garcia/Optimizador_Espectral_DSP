@@ -271,6 +271,15 @@ class OptimizadorGUI:
                 ventana_act.destroy()
 
         threading.Thread(target=hilo_descarga_y_ejecucion).start()
+      
+    def obtener_ruta_licencia(self):
+        """
+        Axioma de E/S: Resuelve un vector de almacenamiento seguro en el espacio del usuario.
+        Almacena la llave como un archivo oculto para evitar violaciones de permisos en /Applications.
+        """
+        import os
+        directorio_usuario = os.path.expanduser("~")
+        return os.path.join(directorio_usuario, ".tgn_licencia.key") 
 
     def salir_aplicacion(self):
         if messagebox.askokcancel("Cierre", "¿Confirma la finalización de los procesos?"):
@@ -443,17 +452,11 @@ class OptimizadorGUI:
             serial_fisico = self.seguridad.extraer_hardware_serial()
             hash_esperado = self.seguridad.generar_llave_maestra(serial_fisico)
             
-            if getattr(sys, 'frozen', False):
-                directorio_base = os.path.dirname(sys.executable)
-                if sys.platform == "darwin" and ".app/Contents/MacOS" in directorio_base:
-                    directorio_base = os.path.abspath(os.path.join(directorio_base, "../../.."))
-            else:
-                directorio_base = os.path.abspath(os.path.dirname(__file__))
-
-            ruta_licencia = os.path.join(directorio_base, "licencia.key")
+            # NUEVO: Invocación de la ruta segura
+            ruta_licencia = self.obtener_ruta_licencia()
 
             if not os.path.exists(ruta_licencia):
-                self.root.after(0, lambda: self.mostrar_ventana_activacion(directorio_base))
+                self.root.after(0, self.mostrar_ventana_activacion)
                 return 
                 
             with open(ruta_licencia, "r") as archivo:
@@ -465,9 +468,17 @@ class OptimizadorGUI:
             messagebox.showerror("Seguridad", f"Colapso en lectura de hardware: {e}")
             return
 
-        ruta_guardado = filedialog.asksaveasfilename(defaultextension=".wav", filetypes=[("WAV", "*.wav")])
+        # NUEVO: Forzar al sistema a ofrecer el Escritorio del usuario como destino de escritura
+        directorio_escritorio = os.path.expanduser("~/Desktop")
+        ruta_guardado = filedialog.asksaveasfilename(
+            initialdir=directorio_escritorio,
+            defaultextension=".wav", 
+            filetypes=[("WAV", "*.wav")]
+        )
+        
         if not ruta_guardado:
             return
+            
         self.btn_exportar.config(text="Sintetizando...", state=tk.DISABLED)
         threading.Thread(target=self.ejecutar_sintesis_dsp, args=(ruta_guardado, self.variable_hardware.get())).start()
     
@@ -529,23 +540,15 @@ class OptimizadorGUI:
             return
 
         try:
-            import sys
             import os
-            
             serial_fisico = self.seguridad.extraer_hardware_serial()
             hash_esperado = self.seguridad.generar_llave_maestra(serial_fisico)
             
-            if getattr(sys, 'frozen', False):
-                directorio_base = os.path.dirname(sys.executable)
-                if sys.platform == "darwin" and ".app/Contents/MacOS" in directorio_base:
-                    directorio_base = os.path.abspath(os.path.join(directorio_base, "../../.."))
-            else:
-                directorio_base = os.path.abspath(os.path.dirname(__file__))
-
-            ruta_licencia = os.path.join(directorio_base, "licencia.key")
+            # NUEVO: Invocación de la ruta segura
+            ruta_licencia = self.obtener_ruta_licencia()
 
             if not os.path.exists(ruta_licencia):
-                self.root.after(0, lambda: self.mostrar_ventana_activacion(directorio_base))
+                self.root.after(0, self.mostrar_ventana_activacion)
                 return 
                 
             with open(ruta_licencia, "r") as archivo:
@@ -708,7 +711,7 @@ class OptimizadorGUI:
         self.barra_progreso['value'] = 0
         self.lbl_porcentaje.config(text="0%")
 
-    def mostrar_ventana_activacion(self, directorio_base):
+    def mostrar_ventana_activacion(self):
         ventana_act = tk.Toplevel(self.root)
         ventana_act.title("Activación de Producto - The Guitar Notebook")
         ventana_act.geometry("550x300")
@@ -748,18 +751,20 @@ class OptimizadorGUI:
         entrada_llave.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(10, 0))
 
         def validar_e_inyectar():
+            import os
             llave_ingresada = entrada_llave.get().strip()
             hash_esperado = self.seguridad.generar_llave_maestra(serial_cliente)
             
             if llave_ingresada == hash_esperado:
-                ruta_licencia = os.path.join(directorio_base, "licencia.key")
+                # NUEVO: Guarda la licencia en la ruta del usuario
+                ruta_licencia = self.obtener_ruta_licencia()
                 try:
                     with open(ruta_licencia, "w") as archivo:
                         archivo.write(llave_ingresada)
                     messagebox.showinfo("Éxito", "Criptografía validada. El Optimizador Espectral está operativo.", parent=ventana_act)
                     ventana_act.destroy()
                 except Exception as e:
-                    messagebox.showerror("Error de E/S", f"No se pudo escribir el archivo: {e}", parent=ventana_act)
+                    messagebox.showerror("Error de E/S", f"No se pudo escribir el archivo en el sistema:\n{e}", parent=ventana_act)
             else:
                 messagebox.showerror("Rechazado", "La llave criptográfica no corresponde a este Hardware ID.", parent=ventana_act)
 
