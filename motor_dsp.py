@@ -22,38 +22,82 @@ class MotorTonalDSP:
 
     def alinear_fase_correlacion(self, senal_obj, senal_fnt):
         """
-        Alineación temporal matemática mediante Correlación Cruzada Rápida.
-        Resuelve el error humano en el recorte de audio encontrando el Lag perfecto.
+        Alineación Temporal LTI Híbrida (Entera + Sub-muestral).
+        Resuelve la discrepancia de fase micrométrica calculando el vértice parabólico
+        de la correlación y aplicando un filtro Sinc para desplazamientos fraccionales.
         """
         import numpy as np
         from scipy import signal
         
-        # 1. Ejecución del Teorema de Correlación Cruzada (FFT para máxima velocidad)
+        # 1. Correlación Cruzada Discreta (Lag Entero)
         correlacion = signal.correlate(senal_obj, senal_fnt, mode="full", method="fft")
         lags = np.arange(-len(senal_fnt) + 1, len(senal_obj))
+        idx_pico = np.argmax(np.abs(correlacion))
+        lag_entero = lags[idx_pico]
         
-        # 2. Extracción del vector de retardo (Tau)
-        lag_optimo = lags[np.argmax(np.abs(correlacion))]
-        
-        # 3. Sincronización Topológica de los Tensores
-        if lag_optimo > 0:
-            # La señal objetivo está adelantada respecto a la fuente
-            obj_sync = senal_obj[lag_optimo:]
+        # 2. Interpolación Parabólica (Axioma de Smith) para Lag Fraccional
+        if 0 < idx_pico < len(correlacion) - 1:
+            y_m1 = np.abs(correlacion[idx_pico - 1])
+            y_0 = np.abs(correlacion[idx_pico])
+            y_p1 = np.abs(correlacion[idx_pico + 1])
+            
+            # Vértice exacto de la parábola
+            denominador = y_m1 - 2 * y_0 + y_p1
+            if denominador != 0:
+                delta = 0.5 * (y_m1 - y_p1) / denominador
+            else:
+                delta = 0.0
+        else:
+            delta = 0.0
+            
+        # 3. Alineación Discreta Básica (Corte de tensores)
+        if lag_entero > 0:
+            obj_sync = senal_obj[lag_entero:]
             fnt_sync = senal_fnt[:len(obj_sync)]
-        elif lag_optimo < 0:
-            # La señal fuente está adelantada respecto al objetivo
-            lag_abs = abs(lag_optimo)
+        elif lag_entero < 0:
+            lag_abs = abs(lag_entero)
             fnt_sync = senal_fnt[lag_abs:]
             obj_sync = senal_obj[:len(fnt_sync)]
         else:
             obj_sync = senal_obj
             fnt_sync = senal_fnt
             
-        # 4. Truncamiento al Mínimo Común (Evita desbordes de RAM)
         min_len = min(len(obj_sync), len(fnt_sync))
+        obj_sync = obj_sync[:min_len]
+        fnt_sync = fnt_sync[:min_len]
         
-        print(f"DEBUG DSP - Compensación de fase aplicada: {lag_optimo} muestras.")
-        return obj_sync[:min_len], fnt_sync[:min_len]
+        # 4. Compensación Sub-muestral (Filtro Sinc)
+        fnt_sync_frac = self.retraso_fraccional_sinc(fnt_sync, delta)
+        
+        return obj_sync, fnt_sync_frac
+
+    def retraso_fraccional_sinc(self, senal, retraso_fraccional, longitud_filtro=32):
+        """
+        Síntesis de Filtro FIR Pasa-todo para el desplazamiento temporal sub-muestral.
+        Utiliza el Teorema de Whittaker-Shannon con ventana de Blackman para mitigar el error de truncamiento.
+        """
+        import numpy as np
+        from scipy.signal import fftconvolve
+        
+        if np.abs(retraso_fraccional) < 1e-5:
+            return senal
+            
+        n = np.arange(-longitud_filtro, longitud_filtro + 1)
+        
+        # Función Sinc continua desplazada por la fracción micrométrica
+        filtro_sinc = np.sinc(n - retraso_fraccional)
+        
+        # Inyección de ventana geométrica (Blackman)
+        ventana = np.blackman(2 * longitud_filtro + 1)
+        filtro_sinc = filtro_sinc * ventana
+        
+        # Normalización de ganancia unitaria (Evita colapso de amplitud)
+        filtro_sinc /= np.sum(filtro_sinc)
+        
+        # Convolución LTI para ejecutar el desplazamiento en el dominio del tiempo
+        senal_desplazada = fftconvolve(senal, filtro_sinc, mode='same')
+        
+        return senal_desplazada
 
     def alinear_energia_rms(self, senal_obj, senal_fnt):
         import numpy as np
@@ -127,55 +171,69 @@ class MotorTonalDSP:
         mse = np.mean((psd_obj_norm - psd_fnt_norm)**2)
         return mse
 
-    def suavizar_espectro_fraccional(self, frecuencias, psd, fraccion_octava=6.0):
+    def extraer_envolvente_logaritmica(self, frecuencias, psd, ancho_banda=0.33):
         """
-        Filtro logarítmico fraccional. El estándar Audio Engineering Society (AES).
-        Conserva resolución en graves y plancha resonancias en agudos.
+        Axioma de Suavizado Psicoacústico (Log-Domain Smoothing).
+        Transforma el eje a escala logarítmica, aplica un filtro gaussiano (1/3 de octava)
+        para difuminar la matriz armónica de las notas, y retorna la EQ pura del equipo.
         """
         import numpy as np
-        psd_suavizado = np.copy(psd)
-        psd_suavizado = np.maximum(np.nan_to_num(psd_suavizado, nan=1e-12), 1e-12)
-        
-        # Factor Q basado en 1/N octavas
-        factor_bw = (2**(1.0 / (2.0 * fraccion_octava)) - 2**(-1.0 / (2.0 * fraccion_octava)))
-        
-        for i, fc in enumerate(frecuencias):
-            if fc < 20.0: # Ignorar ruido sub-sónico
-                continue
-                
-            bw = fc * factor_bw
-            f_min = fc - bw/2.0
-            f_max = fc + bw/2.0
-            
-            idx_min = np.searchsorted(frecuencias, f_min)
-            idx_max = np.searchsorted(frecuencias, f_max)
-            
-            if idx_max > idx_min:
-                psd_suavizado[i] = np.mean(psd[idx_min:idx_max])
-                
-        return psd_suavizado
-    
+        from scipy.ndimage import gaussian_filter1d
+
+        # 1. Ignorar el vector DC (0 Hz) para prevenir el colapso de log(0)
+        idx_validos = frecuencias > 20.0
+        f_validas = frecuencias[idx_validos]
+        p_validos = psd[idx_validos]
+
+        # 2. Transformación al dominio logarítmico (Octavas y Decibeles)
+        log_f = np.log2(f_validas)
+        log_p = 10 * np.log10(np.maximum(p_validos, 1e-12))
+
+        # 3. Interpolación Lineal a Grilla Uniforme
+        # Necesario porque la salida de Welch es lineal en Hz, no en octavas.
+        log_f_uniforme = np.linspace(log_f[0], log_f[-1], len(f_validas) * 2)
+        log_p_interp = np.interp(log_f_uniforme, log_f, log_p)
+
+        # 4. Difuminado Gaussiano Estricto (Desenfoque de notas)
+        # ancho_banda = 0.33 corresponde a 1/3 de Octava (Estándar AES)
+        sigma = (ancho_banda * len(log_f_uniforme)) / (log_f[-1] - log_f[0])
+        log_p_suave = gaussian_filter1d(log_p_interp, sigma=sigma)
+
+        # 5. Retorno al dominio lineal matricial
+        p_suave_db = np.interp(log_f, log_f_uniforme, log_p_suave)
+        p_suave_lineal = 10 ** (p_suave_db / 10.0)
+
+        # 6. Reconstrucción del Tensor Completo (Inyectando el piso sub-sónico)
+        psd_final = np.full(len(frecuencias), 1e-12)
+        psd_final[idx_validos] = p_suave_lineal
+
+        return psd_final
+
     def sintetizar_filtro_fir(self, frecuencias, psd_objetivo, psd_fuente, muestras_salida=2048):
         import numpy as np
+        muestras_salida = int(muestras_salida)
         
-        # 1. Purga espectral: Suavizado psicoacústico logarítmico (1/6 Octava)
-        psd_obj_limpio = self.suavizar_espectro_fraccional(frecuencias, psd_objetivo, fraccion_octava=6.0)
-        psd_fnt_limpia = self.suavizar_espectro_fraccional(frecuencias, psd_fuente, fraccion_octava=6.0)
+        # 1. Extracción Estricta de la Envolvente (Desenfoque de cuerdas)
+        env_obj = self.extraer_envolvente_logaritmica(frecuencias, psd_objetivo, ancho_banda=0.33)
+        env_fnt = self.extraer_envolvente_logaritmica(frecuencias, psd_fuente, ancho_banda=0.33)
         
-        # 2. Magnitud del Filtro (Axioma LTI)
-        H_mag = np.sqrt(psd_obj_limpio / (psd_fnt_limpia + 1e-12))
+        # 2. Magnitud del Filtro LTI Macro
+        H_mag = np.sqrt(env_obj / (env_fnt + 1e-12))
+        H_mag = np.clip(H_mag, 0.01, 100.0) # Límite estricto +/- 40dB
         
-        # 3. Transformada Homomórfica (Reconstrucción de Fase Mínima)
-        cepstrum = np.fft.irfft(np.log(H_mag + 1e-12))
-        n = len(cepstrum)
+        # 3. Transformada Homomórfica (Reconstrucción de Fase Mínima real)
+        cepstrum_fir = np.fft.irfft(np.log(H_mag + 1e-12))
+        n = len(cepstrum_fir)
         ventana = np.zeros(n)
-        ventana[0], ventana[1:n//2], ventana[n//2] = 1.0, 2.0, 1.0
+        ventana[0] = 1.0
+        ventana[1:n//2] = 2.0
+        ventana[n//2] = 1.0
         
-        # 4. Síntesis temporal
-        ir_tiempo = np.fft.irfft(np.exp(np.fft.rfft(cepstrum * ventana)))
-        ir_hardware = ir_tiempo[:muestras_salida]
+        # 4. Síntesis temporal del Impulso
+        ir_tiempo = np.fft.irfft(np.exp(np.fft.rfft(cepstrum_fir * ventana)))
+        ir_hardware = np.copy(ir_tiempo[:muestras_salida])
         
-        # 5. Mitigación del Fenómeno de Gibbs
+        # 5. Mitigación del Fenómeno de Gibbs (Fundido de salida)
         longitud_fade = int(muestras_salida * 0.1)
         ventana_fade = np.linspace(1.0, 0.0, longitud_fade)
         ir_hardware[-longitud_fade:] = ir_hardware[-longitud_fade:] * ventana_fade
@@ -185,22 +243,20 @@ class MotorTonalDSP:
         if pico > 0:
             ir_hardware = (ir_hardware / pico) * (10 ** (-0.1 / 20.0))
             
-        return ir_hardware
-        
+        return np.nan_to_num(ir_hardware)
+
     def exportar_ir(self, vector_ir, nombre_archivo="IR_Clonado_DSP.wav", target_sr_export=None):
-        """
-        Remuestreo Polifásico estricto para hardware.
-        Evita el pre-ringing destructivo del transitorio.
-        """
         from scipy.signal import resample_poly
         import soundfile as sf
+        import numpy as np
         
-        sr_final = target_sr_export if target_sr_export else self.target_sr
+        sr_final = int(target_sr_export if target_sr_export else self.target_sr)
+        sr_origen = int(self.target_sr)
         
-        if sr_final != self.target_sr:
-            # Interpolación estricta usando filtro FIR pasabajos integrado
-            vector_ir = resample_poly(vector_ir, up=sr_final, down=self.target_sr)
+        if sr_final != sr_origen:
+            vector_ir = resample_poly(vector_ir, up=sr_final, down=sr_origen)
             
+        vector_ir = np.nan_to_num(vector_ir)
         sf.write(nombre_archivo, vector_ir, sr_final, subtype='PCM_24')
 
     def cargar_ir_referencia(self, ruta_ir):
@@ -219,8 +275,3 @@ class MotorTonalDSP:
         from scipy.signal import fftconvolve
         senal_final = fftconvolve(senal_amp, vector_ir_ref, mode='same')
         return senal_final
-
-# --- BLOQUE DE VALIDACIÓN ---
-if __name__ == "__main__":
-    motor = MotorTonalDSP()
-    print(f"Motor DSP verificado a {motor.target_sr} Hz.")
