@@ -275,3 +275,40 @@ class MotorTonalDSP:
         from scipy.signal import fftconvolve
         senal_final = fftconvolve(senal_amp, vector_ir_ref, mode='same')
         return senal_final
+    
+    def aislar_tensor_guitarra(self, ruta_mezcla, directorio_salida):
+        """
+        Axioma de Separación de Fuentes Estocásticas (STFT).
+        Utiliza la red neuronal Demucs (htdemucs_6s) aislando estrictamente la guitarra.
+        """
+        import subprocess
+        import os
+        
+# Axioma de Inferencia de Alta Fidelidad:
+        # Se inyecta overlap al 80% y 2 pasadas estocásticas (shifts) para promediar errores de fase.
+        comando = [
+            "demucs", 
+            "-n", "htdemucs_6s",
+            "--two-stems=guitar",
+            "--float32",
+            "--overlap", "0.8",
+            "--shifts", "2",
+            ruta_mezcla,
+            "-o", directorio_salida
+        ]
+        
+        try:
+            # Ejecución bloqueante del subproceso neuronal
+            proceso = subprocess.run(comando, capture_output=True, text=True, check=True)
+            
+            # Reconstrucción de la ruta de salida determinista dictada por Demucs
+            nombre_base = os.path.splitext(os.path.basename(ruta_mezcla))[0]
+            ruta_guitarra_aislada = os.path.join(directorio_salida, "htdemucs_6s", nombre_base, "guitar.wav")
+            
+            if os.path.exists(ruta_guitarra_aislada):
+                return ruta_guitarra_aislada
+            else:
+                raise FileNotFoundError("La red neuronal finalizó, pero la matriz 'guitar.wav' no fue sintetizada.")
+                
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(f"Colapso en la inferencia de Demucs:\n{e.stderr}")

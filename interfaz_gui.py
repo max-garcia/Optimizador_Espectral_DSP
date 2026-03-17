@@ -112,8 +112,15 @@ class OptimizadorGUI:
         frame_controles = ttk.Frame(self.frame_master_hw)
         frame_controles.pack(expand=True, pady=10)
 
-        self.btn_cargar_obj = ttk.Button(frame_controles, text="1. Inyectar Tono Objetivo (.wav)", width=30, command=lambda: self.cargar_archivo("Objetivo"))
-        self.btn_cargar_obj.grid(row=0, column=0, padx=15, pady=10)
+        # Inyección de la topología neuronal Demucs
+        frame_obj = ttk.Frame(frame_controles)
+        frame_obj.grid(row=0, column=0, padx=15, pady=10)
+        
+        self.btn_cargar_obj = ttk.Button(frame_obj, text="1A. Inyectar Objetivo Aislado (.wav)", width=30, command=lambda: self.cargar_archivo("Objetivo"))
+        self.btn_cargar_obj.pack(pady=(0, 5))
+        
+        self.btn_extraer_ia = ttk.Button(frame_obj, text="1B. Extraer de Mezcla Completa (IA)", width=30, command=self.aislar_hilo_extraccion_ia)
+        self.btn_extraer_ia.pack()
 
         self.btn_cargar_fnt = ttk.Button(frame_controles, text="2. Inyectar Tono Grabado (.wav)", width=30, command=lambda: self.cargar_archivo("Fuente"))
         self.btn_cargar_fnt.grid(row=0, column=1, padx=15, pady=10)
@@ -337,6 +344,43 @@ class OptimizadorGUI:
                 elif tipo == "DI_NAM": 
                     self.ruta_di_nam = ruta
                     self.btn_cargar_di_nam.config(text="2. DI Limpio Inyectado ✓")
+
+    def aislar_hilo_extraccion_ia(self):
+        ruta_mezcla = filedialog.askopenfilename(title="Seleccionar Mezcla Comercial", filetypes=[("Archivos de Audio", "*.wav *.mp3 *.flac")])
+        if not ruta_mezcla:
+            return
+            
+        advertencia = (
+            "La separación neuronal exige alto poder de cómputo (CPU/GPU).\n\n"
+            "1. La primera vez, el sistema descargará el modelo matricial 'htdemucs_6s' (~300MB).\n"
+            "2. El proceso puede tardar varios minutos dependiendo de su hardware.\n\n"
+            "¿Desea inicializar la inferencia IA?"
+        )
+        
+        if messagebox.askokcancel("Carga Computacional", advertencia):
+            import os
+            # Definimos un directorio temporal en el espacio del usuario para alojar los tensores
+            directorio_temp = os.path.expanduser("~/TGN_Stem_Cache")
+            os.makedirs(directorio_temp, exist_ok=True)
+            
+            self.btn_extraer_ia.config(text="Separando Matriz... (Espere)", state=tk.DISABLED)
+            threading.Thread(target=self.ejecutar_extraccion_ia, args=(ruta_mezcla, directorio_temp)).start()
+
+    def ejecutar_extraccion_ia(self, ruta_mezcla, directorio_temp):
+        try:
+            ruta_tensor_aislado = self.motor.aislar_tensor_guitarra(ruta_mezcla, directorio_temp)
+            
+            # Inyectamos el resultado estocástico directamente como nuestro tono objetivo LTI
+            self.ruta_objetivo = ruta_tensor_aislado
+            
+            self.root.after(0, lambda: self.btn_cargar_obj.config(text="1A. Objetivo Inyectado (Vía IA) ✓"))
+            self.root.after(0, lambda: messagebox.showinfo("Inferencia Exitosa", f"Tensor de guitarra aislado y asignado a la ecuación LTI.\n\nRuta: {ruta_tensor_aislado}"))
+            
+        except Exception as e:
+            self.root.after(0, lambda err=str(e): messagebox.showerror("Colapso Neuronal", err))
+        finally:
+            self.root.after(0, lambda: self.btn_extraer_ia.config(text="1B. Extraer de Mezcla Completa (IA)", state=tk.NORMAL))
+
 
     def seleccionar_directorio_nam(self):
         ruta_dir = filedialog.askdirectory(title="Seleccionar Carpeta de Búsqueda")
