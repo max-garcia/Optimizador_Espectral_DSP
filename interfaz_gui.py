@@ -116,10 +116,22 @@ class OptimizadorGUI:
         frame_obj = ttk.Frame(frame_controles)
         frame_obj.grid(row=0, column=0, padx=15, pady=10)
         
-        self.btn_cargar_obj = ttk.Button(frame_obj, text="1A. Inyectar Objetivo Aislado (.wav)", width=30, command=lambda: self.cargar_archivo("Objetivo"))
+        self.btn_cargar_obj = ttk.Button(frame_obj, text="1A. Inyectar Objetivo Aislado (.wav)", width=35, command=lambda: self.cargar_archivo("Objetivo"))
         self.btn_cargar_obj.pack(pady=(0, 5))
         
-        self.btn_extraer_ia = ttk.Button(frame_obj, text="1B. Extraer de Mezcla Completa (IA)", width=30, command=self.aislar_hilo_extraccion_ia)
+        # Selectores Paramétricos para IA
+        frame_ia_params = ttk.Frame(frame_obj)
+        frame_ia_params.pack(fill=tk.X, pady=5)
+        
+        ttk.Label(frame_ia_params, text="Motor:", font=('SF Pro Display', 10)).grid(row=0, column=0, sticky=tk.W)
+        self.var_demucs_hw = tk.StringVar(value="cpu")
+        ttk.Combobox(frame_ia_params, textvariable=self.var_demucs_hw, values=("cpu", "cuda"), state="readonly", width=8).grid(row=0, column=1, padx=5)
+
+        ttk.Label(frame_ia_params, text="Calidad:", font=('SF Pro Display', 10)).grid(row=1, column=0, sticky=tk.W, pady=2)
+        self.var_demucs_calidad = tk.StringVar(value="Estándar")
+        ttk.Combobox(frame_ia_params, textvariable=self.var_demucs_calidad, values=("Básico", "Estándar", "Pro"), state="readonly", width=8).grid(row=1, column=1, padx=5)
+
+        self.btn_extraer_ia = ttk.Button(frame_obj, text="1B. Extraer de Mezcla Completa (IA)", width=35, command=self.aislar_hilo_extraccion_ia)
         self.btn_extraer_ia.pack()
 
         self.btn_cargar_fnt = ttk.Button(frame_controles, text="2. Inyectar Tono Grabado (.wav)", width=30, command=lambda: self.cargar_archivo("Fuente"))
@@ -290,6 +302,7 @@ class OptimizadorGUI:
 
     def salir_aplicacion(self):
         if messagebox.askokcancel("Cierre", "¿Confirma la finalización de los procesos?"):
+            self.aniquilar_cache_neuronal()
             self.root.quit()
             self.root.destroy()    
 
@@ -351,21 +364,45 @@ class OptimizadorGUI:
             return
             
         advertencia = (
-            "La separación neuronal exige alto poder de cómputo (CPU/GPU).\n\n"
-            "1. La primera vez, el sistema descargará el modelo matricial 'htdemucs_6s' (~300MB).\n"
-            "2. El proceso puede tardar varios minutos dependiendo de su hardware.\n\n"
+            "La separación neuronal exige rigor computacional.\n\n"
+            "El subproceso operará fuera del hilo principal para mantener la GUI fluida.\n"
             "¿Desea inicializar la inferencia IA?"
         )
         
         if messagebox.askokcancel("Carga Computacional", advertencia):
             import os
-            # Definimos un directorio temporal en el espacio del usuario para alojar los tensores
+            from motor_dsp import DemucsRunner, DemucsInferenceConfig, ComputeDevice, TargetStem, QualityLevel
+            
             directorio_temp = os.path.expanduser("~/TGN_Stem_Cache")
             os.makedirs(directorio_temp, exist_ok=True)
             
             self.btn_extraer_ia.config(text="Separando Matriz... (Espere)", state=tk.DISABLED)
-            threading.Thread(target=self.ejecutar_extraccion_ia, args=(ruta_mezcla, directorio_temp)).start()
+            
+            mapa_calidad = {
+                "Básico": QualityLevel.DRAFT,
+                "Estándar": QualityLevel.STANDARD,
+                "Pro": QualityLevel.PRO
+            }
+            hw_seleccionado = ComputeDevice.CUDA if self.var_demucs_hw.get() == "cuda" else ComputeDevice.CPU
+            calidad_seleccionada = mapa_calidad.get(self.var_demucs_calidad.get(), QualityLevel.STANDARD)
 
+            config_demucs = DemucsInferenceConfig(
+                device=hw_seleccionado,
+                quality=calidad_seleccionada,
+                stem=TargetStem.GUITAR
+            )
+
+            self.runner_ia = DemucsRunner(config=config_demucs, input_path=ruta_mezcla, output_dir=directorio_temp)
+            
+            self.barra_progreso['value'] = 0
+            self.lbl_porcentaje.config(text="0%")
+
+            # Ejecución con inyección de dependencias estocásticas
+            self.runner_ia.start_extraction(
+                on_progress=lambda p: self.root.after(0, self.actualizar_progreso, p),
+                on_complete=lambda code: self.root.after(0, self.finalizar_extraccion_ia, code, directorio_temp, ruta_mezcla),
+                on_error=lambda err: self.root.after(0, self.error_extraccion_ia, err)
+            )
     def ejecutar_extraccion_ia(self, ruta_mezcla, directorio_temp):
         try:
             ruta_tensor_aislado = self.motor.aislar_tensor_guitarra(ruta_mezcla, directorio_temp)
@@ -616,7 +653,8 @@ class OptimizadorGUI:
         import numpy as np
         import os
         import threading
-        
+        import gc  # <--- Inyección del colector de basura
+
         try:
             senal_obj, _ = self.motor.cargar_audio(self.ruta_objetivo_nam)
             senal_di, _ = self.motor.cargar_audio(self.ruta_di_nam)
@@ -651,7 +689,7 @@ class OptimizadorGUI:
                     for nombre_ir, vector_ir in banco_irs.items():
                         senal_final = senal_amp if nombre_ir == "Bypass_Directo" else self.motor.aplicar_gabinete_referencia(senal_amp, vector_ir)
                         
-                        # Inyección estricta de alineación por fase dentro de la matriz combinatoria
+                        # Inyección estricta de alineación por fase
                         senal_obj_sync, senal_final_sync = self.motor.alinear_fase_correlacion(senal_obj, senal_final)
                         senal_final_alineada = self.motor.alinear_energia_rms(senal_obj_sync, senal_final_sync)
                         
@@ -678,6 +716,11 @@ class OptimizadorGUI:
                 except Exception as e:
                     print(f"Error estructural procesando {nombre_nam}: {e}")
                     iteracion_actual += len(banco_irs)
+                finally:
+                    # AXIOMA DE VOLATILIDAD (Previene Out of Memory en matrices grandes)
+                    if 'senal_amp' in locals():
+                        del senal_amp
+                    gc.collect()
 
             if amp_ganador and psd_ganador is not None:
                 nivel = self.var_tolerancia.get()
@@ -687,7 +730,6 @@ class OptimizadorGUI:
                     texto_final = f"Amplificador (.nam): {amp_ganador}\nIR: {ir_ganador}"
                     self.root.after(0, lambda: self.lbl_resultado_nam.config(text=texto_final, foreground="#00ffcc"))
                     
-                    # Extraemos el psd original sincronizado para graficar correctamente
                     _, psd_obj_render = self.motor.calcular_psd_welch(senal_obj[:len(freqs_ganador)*2]) 
                     self.root.after(0, self.renderizar_espectro, freqs_ganador, psd_obj_render, freqs_ganador, psd_ganador)
                 else:
@@ -699,8 +741,7 @@ class OptimizadorGUI:
         except Exception as e:
             self.root.after(0, lambda err=str(e): messagebox.showerror("Colapso Analítico", err))
         finally:
-            self.root.after(0, lambda: self.btn_buscar_nam.config(text="Ejecutar Matriz Combinatoria", state=tk.NORMAL)) 
-
+            self.root.after(0, lambda: self.btn_buscar_nam.config(text="Ejecutar Matriz Combinatoria", state=tk.NORMAL))
     def construir_firma_ingenieria(self):
         frame_branding = ttk.Frame(self.root)
         frame_branding.pack(side=tk.BOTTOM, fill=tk.X, padx=20, pady=10)
@@ -739,6 +780,8 @@ class OptimizadorGUI:
         self.btn_cargar_di_nam.config(text="2. Tono DI Limpio (.wav)")
         self.btn_cargar_dir_nam.config(text="3. Carpeta Cabezales (.nam)")
         self.btn_cargar_dir_ir.config(text="4. Carpeta Gabinetes IR (.wav)")
+
+        self.aniquilar_cache_neuronal()
         
         self.lbl_resultado_nam.config(text="Estado: Esperando tensores...", foreground="") 
         
@@ -815,6 +858,256 @@ class OptimizadorGUI:
         btn_activar = ttk.Button(frame_interno, text="Activar Software", command=validar_e_inyectar)
         btn_activar.pack(pady=10)
 
+    def ejecutar_busqueda_dsp(self):
+        import numpy as np
+        import os
+        import threading
+        import gc  # <--- Inyección del colector de basura
+
+        # 1. AISLAMIENTO ESTRUCTURAL (Prevención de Condición de Carrera)
+        try:
+            ruta_obj_local = self.ruta_objetivo_nam
+            ruta_di_local = self.ruta_di_nam
+            ruta_dir_nam_local = self.ruta_directorio_nam
+            ruta_dir_ir_local = getattr(self, 'ruta_directorio_ir', None)
+        except AttributeError as e:
+            print(f"Error topológico: Faltan variables pre-ejecución ({e})")
+            self.root.after(0, lambda: self.btn_buscar_nam.config(text="Ejecutar Matriz Combinatoria", state="normal"))
+            return
+
+        try:
+            # 2. CARGA DE TENSORES
+            senal_obj, _ = self.motor.cargar_audio(ruta_obj_local)
+            senal_di, _ = self.motor.cargar_audio(ruta_di_local)
+
+            archivos_nam = [f for f in os.listdir(ruta_dir_nam_local) if f.endswith('.nam')]
+            
+            banco_irs = {}
+            if ruta_dir_ir_local:
+                for arch_ir in [f for f in os.listdir(ruta_dir_ir_local) if f.endswith('.wav')]:
+                    banco_irs[arch_ir] = self.motor.cargar_ir_referencia(os.path.join(ruta_dir_ir_local, arch_ir))
+            else:
+                banco_irs["Bypass_Directo"] = np.array([1.0])
+
+            menor_mse = float('inf')
+            amp_ganador = None
+            ir_ganador = None
+            psd_ganador = None
+            freqs_ganador = None
+            psd_obj_ganador = None 
+            
+            total_iteraciones = len(archivos_nam) * len(banco_irs)
+            iteracion_actual = 0
+
+            # 3. OPTIMIZACIÓN ASINTÓTICA: Cálculo de Welch Objetivo fuera del bucle de O(n)
+            # Extraemos la matriz LTI base una sola vez, ahorrando ciclos de CPU.
+            freqs_obj_welch, psd_obj_welch = self.motor.calcular_psd_welch(senal_obj)
+            rms_obj = np.sqrt(np.mean(senal_obj**2))
+
+            for nombre_nam in archivos_nam:
+                try:
+                    senal_amp = self.motor.inferencia_neuronal_nam(os.path.join(ruta_dir_nam_local, nombre_nam), senal_di)
+
+                    if senal_amp is None or np.max(np.abs(senal_amp)) < 1e-6 or np.isnan(senal_amp).any():
+                        print(f"Axioma fallido: El tensor {nombre_nam} generó silencio absoluto.")
+                        iteracion_actual += len(banco_irs)
+                        continue
+
+                    for nombre_ir, vector_ir in banco_irs.items():
+                        senal_final = senal_amp if nombre_ir == "Bypass_Directo" else self.motor.aplicar_gabinete_referencia(senal_amp, vector_ir)
+                        
+                        # 4. AXIOMA DE INVARIANZA ESPECTRAL: Sin recortes de fase.
+                        # Alineamos puramente la energía RMS soportando archivos de distinta longitud.
+                        rms_fnt = np.sqrt(np.mean(senal_final**2))
+                        if rms_fnt > 1e-12:
+                            senal_final_alineada = senal_final * (rms_obj / rms_fnt)
+                        else:
+                            senal_final_alineada = senal_final
+                            
+                        # Extracción Welch directa sobre la matriz asimétrica
+                        _, psd_test = self.motor.calcular_psd_welch(senal_final_alineada)
+                        
+                        if np.isnan(psd_test).any() or np.max(psd_test) < 1e-12:
+                            iteracion_actual += 1
+                            continue
+                            
+                        mse_actual = self.motor.calcular_mse_espectral(psd_obj_welch, psd_test)
+
+                        # Actualización de escalares y conservación de tensores LTI óptimos
+                        if mse_actual < menor_mse:
+                            menor_mse = mse_actual
+                            amp_ganador = nombre_nam
+                            ir_ganador = nombre_ir
+                            psd_ganador = np.copy(psd_test)
+                            freqs_ganador = np.copy(freqs_obj_welch)
+                            psd_obj_ganador = np.copy(psd_obj_welch) # Capturamos el renderizado perfecto
+
+                        iteracion_actual += 1
+                        progreso = (iteracion_actual / total_iteraciones) * 100
+                        self.root.after(0, lambda p=progreso: self.actualizar_progreso(p))
+                        
+                except Exception as e:
+                    print(f"Error estructural procesando {nombre_nam}: {e}")
+                    iteracion_actual += len(banco_irs)
+                finally:
+                    # 5. AXIOMA DE VOLATILIDAD (Gestión Estricta de RAM)
+                    if 'senal_amp' in locals():
+                        del senal_amp
+                    gc.collect()
+
+            # 6. RESOLUCIÓN GRÁFICA Y DE ESTADO
+            if amp_ganador and psd_ganador is not None and psd_obj_ganador is not None:
+                nivel = self.var_tolerancia.get()
+                umbral = 5.0 if "Perfección" in nivel else 15.0 if "Aceptable" in nivel else 30.0
+                
+                if menor_mse <= umbral:
+                    texto_final = f"Amplificador (.nam): {amp_ganador}\nIR: {ir_ganador}"
+                    self.root.after(0, lambda: self.lbl_resultado_nam.config(text=texto_final, foreground="#00ffcc"))
+                    
+                    # Inyección del render usando el tensor exacto sin truncar dimensiones temporales
+                    self.root.after(0, self.renderizar_espectro, freqs_ganador, psd_obj_ganador, freqs_ganador, psd_ganador)
+                else:
+                    texto_fallo = f"Rechazado. MSE: {menor_mse:.2f}\nSupera el umbral topológico."
+                    self.root.after(0, lambda: self.lbl_resultado_nam.config(text=texto_fallo, foreground="red"))
+            else:
+                self.root.after(0, lambda: self.lbl_resultado_nam.config(text="Fallo analítico: Matriz evaluada en vacío.", foreground="red"))
+                
+        except Exception as e:
+            self.root.after(0, lambda err=str(e): messagebox.showerror("Colapso Analítico", err))
+        finally:
+            self.root.after(0, lambda: self.btn_buscar_nam.config(text="Ejecutar Matriz Combinatoria", state="normal"))
+    # =========================================================================
+    # AXIOMAS NEURONALES UNIFICADOS (Purgando duplicados)
+    # =========================================================================
+    def aislar_hilo_extraccion_ia(self):
+        ruta_mezcla = filedialog.askopenfilename(title="Seleccionar Mezcla Comercial", filetypes=[("Archivos de Audio", "*.wav *.mp3 *.flac")])
+        if not ruta_mezcla:
+            return
+            
+        advertencia = (
+            "La separación neuronal exige rigor computacional.\n\n"
+            "El subproceso operará fuera del hilo principal para mantener la GUI fluida.\n"
+            "¿Desea inicializar la inferencia IA?"
+        )
+        
+        if messagebox.askokcancel("Carga Computacional", advertencia):
+            import os
+            from motor_dsp import DemucsRunner, DemucsInferenceConfig, ComputeDevice, TargetStem, QualityLevel
+            
+            directorio_temp = os.path.expanduser("~/TGN_Stem_Cache")
+            os.makedirs(directorio_temp, exist_ok=True)
+            
+            self.btn_extraer_ia.config(text="Separando Matriz... (Espere)", state=tk.DISABLED)
+            
+            mapa_calidad = {
+                "Básico": QualityLevel.DRAFT,
+                "Estándar": QualityLevel.STANDARD,
+                "Pro": QualityLevel.PRO
+            }
+            hw_seleccionado = ComputeDevice.CUDA if self.var_demucs_hw.get() == "cuda" else ComputeDevice.CPU
+            calidad_seleccionada = mapa_calidad.get(self.var_demucs_calidad.get(), QualityLevel.STANDARD)
+
+            config_demucs = DemucsInferenceConfig(
+                device=hw_seleccionado,
+                quality=calidad_seleccionada,
+                stem=TargetStem.GUITAR
+            )
+
+            self.runner_ia = DemucsRunner(config=config_demucs, input_path=ruta_mezcla, output_dir=directorio_temp)
+            
+            self.barra_progreso['value'] = 0
+            self.lbl_porcentaje.config(text="0%")
+
+            self.runner_ia.start_extraction(
+                on_progress=lambda p: self.root.after(0, self.actualizar_progreso, p),
+                on_complete=lambda code: self.root.after(0, self.finalizar_extraccion_ia, code, directorio_temp, ruta_mezcla),
+                on_error=lambda err: self.root.after(0, self.error_extraccion_ia, err)
+            )
+
+    def finalizar_extraccion_ia(self, return_code: int, directorio_temp: str, ruta_mezcla: str):
+        import os
+        
+        if return_code != 0:
+            self.error_extraccion_ia(f"El hilo secundario abortó con estado: {return_code}")
+            return
+            
+        nombre_base = os.path.splitext(os.path.basename(ruta_mezcla))[0]
+        ruta_tensor = os.path.join(directorio_temp, "htdemucs_6s", nombre_base, "guitar.wav")
+        
+        if os.path.exists(ruta_tensor):
+            self.ruta_objetivo = ruta_tensor
+            self.btn_cargar_obj.config(text="1A. Objetivo Inyectado (Vía IA) ✓")
+            self.btn_extraer_ia.config(text="1B. Extraer de Mezcla Completa (IA)", state="normal")
+            self.actualizar_progreso(100.0)
+            
+            messagebox.showinfo(
+                "Inferencia Exitosa", 
+                f"Matriz aislada rigurosamente e inyectada como LTI objetivo.\n\nVector de destino:\n{ruta_tensor}"
+            )
+        else:
+            self.error_extraccion_ia(f"Fallo de E/S estocástico. El tensor no se materializó en:\n{ruta_tensor}")
+
+    def error_extraccion_ia(self, error_msg: str):
+        self.btn_extraer_ia.config(text="1B. Extraer de Mezcla Completa (IA)", state=tk.NORMAL)
+        messagebox.showerror("Colapso Neuronal", f"Fallo en el motor de separación:\n{error_msg}")
+    def error_extraccion_ia(self, error_msg: str):
+        """ Callback de manejo de fallos en T_GUI """
+        self.btn_extraer_ia.config(text="1B. Extraer de Mezcla Completa (IA)", state=tk.NORMAL)
+        messagebox.showerror("Colapso Neuronal", f"Fallo en el motor de separación:\n{error_msg}")
+
+    def finalizar_extraccion_ia(self, return_code: int, directorio_temp: str, ruta_mezcla: str):
+        import os
+        
+        if return_code != 0:
+            self.error_extraccion_ia(f"El hilo secundario abortó con estado: {return_code}")
+            return
+            
+        # 1. Resolución del identificador original (sin extensión geométrica)
+        # Si ruta_mezcla es "/Usuarios/Max/Master_Cancion.wav", nombre_base será "Master_Cancion"
+        nombre_base = os.path.splitext(os.path.basename(ruta_mezcla))[0]
+        
+        # 2. Ensamblaje topológico del árbol de directorios de Demucs
+        ruta_tensor = os.path.join(directorio_temp, "htdemucs_6s", nombre_base, "guitar.wav")
+        
+        # 3. Validación Binaria (Axioma de Existencia)
+        if os.path.exists(ruta_tensor):
+            # Mutación de memoria autorizada
+            self.ruta_objetivo = ruta_tensor
+            
+            # Reversión de los controles de la interfaz al estado nominal
+            self.btn_cargar_obj.config(text="1A. Objetivo Inyectado (Vía IA) ✓")
+            self.btn_extraer_ia.config(text="1B. Extraer de Mezcla Completa (IA)", state="normal")
+            self.actualizar_progreso(100.0)
+            
+            from tkinter import messagebox
+            messagebox.showinfo(
+                "Inferencia Exitosa", 
+                f"Matriz aislada rigurosamente e inyectada como LTI objetivo.\n\nVector de destino:\n{ruta_tensor}"
+            )
+        else:
+            self.error_extraccion_ia(f"Fallo de E/S estocástico. El tensor no se materializó en:\n{ruta_tensor}")
+
+
+    def aniquilar_cache_neuronal(self):
+        """
+        Axioma de Volatilidad: Libera estrictamente el espacio de almacenamiento temporal
+        ocupado por los tensores estocásticos de Demucs.
+        """
+        import os
+        import shutil
+        
+        directorio_temp = os.path.expanduser("~/TGN_Stem_Cache")
+        
+        # Verificación del estado de existencia en el sistema de archivos
+        if os.path.exists(directorio_temp):
+            try:
+                # Eliminación recursiva del árbol de directorios
+                shutil.rmtree(directorio_temp)
+                print(f"Memoria de almacenamiento liberada: {directorio_temp}")
+            except Exception as e:
+                # Captura silenciosa: El sistema operativo podría tener el archivo bloqueado (File Lock).
+                # No lanzamos un messagebox para no interrumpir el cierre del programa.
+                print(f"Colapso en la aniquilación de caché: {e}")
 if __name__ == "__main__":
     raiz = tk.Tk()
     

@@ -1,21 +1,20 @@
-# Entornos virtuales
-entorno_dsp/
-venv/
-
-# Archivos de caché compilados
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Archivos de compilación de macOS y PyInstaller
-.DS_Store
+# Binarios y compilaciones
+*.dmg
+*.pkg
+*.app/
 build/
 dist/
-*.spec
 
-# Archivos de audio temporales (Ruido para el repositorio)
-*.wav
-*.mp3
-*.nam
-*.syx
-*.ir
+# Entornos virtuales y librerías pesadas
+venv_dsp/
+venv/
+**/libtorch_cpu.dylib
+**/libllvmlite.dylib
+
+# Caché estocástica y temporal
+TGN_Stem_Cache/
+__pycache__/
+*.pyc
+.cache/
+dmg_origen/
+*.app/
