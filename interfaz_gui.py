@@ -31,6 +31,7 @@ class OptimizadorGUI:
         self.root = root
         self.root.title("TGN Tone Architect - The Guitar Notebook")
         self.root.geometry("1000x750") 
+        self.fs_origen = 44100
         
         self.motor = MotorTonalDSP()
         self.seguridad = CriptografiaHWID()
@@ -337,11 +338,15 @@ class OptimizadorGUI:
             vector_ir = self.motor.sintetizar_filtro_fir(freqs_obj, psd_obj, psd_fnt, muestras_salida=muestras)
             
             # Resampling y Truncamiento riguroso si la frecuencia de origen no coincide
-            if fs_origen != sr_salida:
-                vector_ir = librosa.resample(vector_ir, orig_sr=fs_origen, target_sr=sr_salida)
-                vector_ir = vector_ir[:muestras] 
+            # Resampling y Truncamiento riguroso
+            # CAMBIO: Usamos fs_obj que fue definida arriba al cargar el audio objetivo
+            if fs_obj != sr_salida:
+                vector_ir = librosa.resample(vector_ir, orig_sr=fs_obj, target_sr=sr_salida)
+                
+            # Garantizamos que la longitud del vector coincida con el límite del hardware (Axioma de Truncamiento)
+            vector_ir = vector_ir[:muestras] 
 
-            # Síntesis Binaria Estricta (soundfile controla la profundidad de bits)
+            # Síntesis Binaria Estricta
             sf.write(ruta_guardado, vector_ir, sr_salida, subtype=formato_bits)
 
             self.root.after(0, lambda: messagebox.showinfo(
@@ -807,7 +812,24 @@ class OptimizadorGUI:
         messagebox.showinfo("Estado", "El módulo de actualización requiere binarios compilados.")
 
 if __name__ == "__main__":
+    import sys
+    import multiprocessing
+    
+    # AXIOMA 1: Soporte estricto para multiprocesamiento en binarios compilados
+    multiprocessing.freeze_support() 
+    
+    # AXIOMA 2: Enrutamiento Neuronal Estricto (Bloqueo de Fork Bomb)
+    # Intercepta el subprocess.Popen de motor_dsp.py para ejecutar IA sin abrir la GUI
+    if len(sys.argv) >= 3 and sys.argv[1] == "-m" and sys.argv[2] == "demucs.separate":
+        from demucs.separate import main as demucs_main
+        # Rebanamos la matriz de argumentos (ignoramos el ejecutable y las banderas '-m', 'demucs.separate')
+        argumentos_demucs = sys.argv[3:]
+        # Ejecutamos la separación tensorial y terminamos el hilo con el código de salida exacto
+        sys.exit(demucs_main(argumentos_demucs))
+        
+    # AXIOMA 3: Inicialización de la Interfaz Gráfica (Flujo Nominal)
     raiz = tk.Tk()
+    
     style = ttk.Style()
     if 'aqua' in style.theme_names():
         style.theme_use('aqua') 

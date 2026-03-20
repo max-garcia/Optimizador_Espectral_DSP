@@ -173,11 +173,13 @@ class MotorTonalDSP:
 
     def cargar_audio(self, ruta_archivo):
         try:
+            # CAMBIO: Guardamos sr en self.target_sr (o self.fs_origen) 
+            # para que persista en el objeto
             senal, sr = librosa.load(ruta_archivo, sr=self.target_sr, mono=True)
+            self.fs_origen = sr # <--- AÑADE ESTA LÍNEA
             return senal, sr
         except Exception as e:
             raise ValueError(f"Error topológico al procesar la matriz de audio: {e}")
-
     def alinear_fase_correlacion(self, senal_obj, senal_fnt):
         """
         Alineación Temporal LTI Híbrida (Entera + Sub-muestral).
