@@ -1,4 +1,4 @@
-# TGN Tone Architect (v1.4) 🎸📐
+# TGN Tone Architect (v1.4)
 ### Engine for Neural Audio Matching & Spectral Optimization
 
 **TGN Tone Architect** es un ecosistema de procesamiento digital de señales (DSP) diseñado para la captura y recreación de timbres de amplificación de alta fidelidad. Utiliza inferencia neuronal (NAM) y convolución de respuesta al impulso (IR) para encontrar la combinación óptima de hardware modelado mediante análisis de error cuadrático medio (MSE) en el dominio de la frecuencia.
@@ -23,7 +23,7 @@ Donde $P(f)$ es la densidad de potencia espectral normalizada. El sistema busca 
 
 ---
 
-## 🚀 Características Premium
+## Características Premium
 
 * **Matriz Combinatoria:** Prueba automática de múltiples modelos `.nam` contra bancos de IRs `.wav`.
 * **Alineación Energética Automática:** Normalización basada en RMS para comparaciones auditivas y matemáticas justas.
@@ -32,7 +32,7 @@ Donde $P(f)$ es la densidad de potencia espectral normalizada. El sistema busca 
 
 ---
 
-## 🛠 Instalación y Uso (macOS)
+## Instalación y Uso (macOS)
 
 El software se distribuye como una imagen de disco (.dmg) monolítica que incluye todas las dependencias (PyTorch, Librosa, SciPy).
 
@@ -42,7 +42,7 @@ El software se distribuye como una imagen de disco (.dmg) monolítica que incluy
 
 ---
 
-## 📂 Estructura del Proyecto
+## Estructura del Proyecto
 
 * `interfaz_gui.py`: Lógica de la UI y gestión de estados de la matriz.
 * `motor_dsp.py`: Núcleo matemático, inferencia NAM y cálculos de PSD.
@@ -51,7 +51,7 @@ El software se distribuye como una imagen de disco (.dmg) monolítica que incluy
 
 ---
 
-## 👨‍💻 Desarrollado por:
+## Desarrollado por:
 **Max García** - *The Guitar Notebook*
 *Formación: Matemática Pura*
 
