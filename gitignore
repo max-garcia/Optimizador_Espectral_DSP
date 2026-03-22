@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv_dsp/
+
+# Audio (No subir muestras locales)
+*.wav
+*.mp3
+*.aif
+
+# macOS
+.DS_Store

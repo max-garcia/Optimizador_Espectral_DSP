@@ -380,3 +380,140 @@ class MotorTonalDSP:
     def aplicar_gabinete_referencia(self, senal_amp, vector_ir_ref):
         senal_final = fftconvolve(senal_amp, vector_ir_ref, mode='same')
         return senal_final
+    
+    # =====================================================================
+    # MÓDULOS DE ANÁLISIS TOPOLÓGICO Y DECONVOLUCIÓN (Vanguardia DSP)
+    # =====================================================================
+
+    def analizar_matriz_audio(self, senal):
+        """
+        Evaluación topológica estricta con Detección de Picos Diferenciales.
+        Inmune a los falsos positivos generados por autocorrelación de ondas cuadradas (Distorsión).
+        """
+        import numpy as np
+        from scipy import signal
+        
+        # 1. Análisis Estocástico
+        rms = np.sqrt(np.mean(senal**2))
+        pico = np.max(np.abs(senal))
+        factor_cresta = pico / (rms + 1e-12)
+        
+        frecuencias, psd = signal.welch(senal, fs=self.target_sr, nperseg=4096)
+        psd_norm = psd / np.sum(psd)
+        entropia_espectral = -np.sum(psd_norm * np.log2(psd_norm + 1e-12))
+        
+        # 2. Análisis Espacial (Autocorrelación de Envolvente)
+        senal_rectificada = np.abs(senal)
+        b, a = signal.butter(2, 10 / (self.target_sr / 2), btype='low')
+        envolvente = signal.filtfilt(b, a, senal_rectificada)
+        
+        autocorr = signal.correlate(envolvente, envolvente, mode='full')
+        autocorr_positiva = autocorr[len(autocorr)//2:]
+        autocorr_norm = autocorr_positiva / (autocorr_positiva[0] + 1e-12)
+        
+        lag_ignorado = int(0.05 * self.target_sr) # Ignoramos la LTI inicial (50ms)
+        
+        # AXIOMA DE DETECCIÓN: Búsqueda estricta de máximos locales (rebotes)
+        seccion_analisis = autocorr_norm[lag_ignorado:]
+        # prominence=0.02 exige que el pico resalte al menos un 2% por encima de la pendiente
+        picos, propiedades = signal.find_peaks(seccion_analisis, height=0.15, prominence=0.02)
+        
+        if len(picos) > 0:
+            eco_maximo = np.max(propiedades['peak_heights'])
+            hay_delay = True
+        else:
+            eco_maximo = 0.0
+            hay_delay = False
+            
+        umbral_energia = 0.15 * np.max(envolvente)
+        proporcion_sostenida = np.sum(envolvente > umbral_energia) / len(envolvente)
+
+        # 3. Axiomas de Decisión
+        es_complejo = factor_cresta < 4.5 and entropia_espectral > 8.0
+        hay_reverb = proporcion_sostenida > 0.50 and factor_cresta >= 4.0
+        
+        hay_ltv = hay_delay or hay_reverb
+
+        diagnostico = []
+        if es_complejo: 
+            diagnostico.append(f"Alta densidad (Entropía: {entropia_espectral:.1f}, Cresta: {factor_cresta:.1f}). Superposición.")
+        if hay_ltv: 
+            if hay_delay: diagnostico.append(f"Anomalía LTV: Delay detectado (Eco real: {eco_maximo:.2f}).")
+            if hay_reverb: diagnostico.append(f"Anomalía LTV: Reverb detectada (Sustain: {proporcion_sostenida:.2f}).")
+            
+        return es_complejo, hay_ltv, " | ".join(diagnostico)
+
+    def deconvolucion_ceps_anecoica(self, senal_ir, ventana_quefrecuencia=250):
+        """
+        Aislamiento Anecoico mediante Deconvolución Homomórfica (Dominio Cepstral).
+        Elimina reflexiones espaciales (Room Reverb) reteniendo la fase mínima del gabinete.
+        """
+        import numpy as np
+        from scipy.fft import fft, ifft
+        
+        espectro_X = fft(senal_ir)
+        magnitud = np.maximum(np.abs(espectro_X), 1e-12)
+        fase = np.angle(espectro_X)
+        
+        log_espectro_X = np.log(magnitud) + 1j * fase
+        cepstrum_x = ifft(log_espectro_X).real
+        
+        # Lifter (Filtro en el dominio de la quefrecuencia)
+        lifter = np.zeros_like(cepstrum_x)
+        lifter[:ventana_quefrecuencia] = 1.0
+        lifter[-ventana_quefrecuencia+1:] = 1.0 
+        
+        cepstrum_filtrado = cepstrum_x * lifter
+        espectro_lineal = np.exp(fft(cepstrum_filtrado))
+        
+        return ifft(espectro_lineal).real
+    
+    def calcular_fronteras_espectrales(self, freqs, psd):
+        """
+        Análisis Topológico por Ventana Deslizante (Sliding Window Theorem).
+        Detecta amputaciones de IA escaneando caídas verticales en los agudos,
+        ignorando por completo el sesgo de energía de los subgraves.
+        """
+        import numpy as np
+
+        psd_db = 10 * np.log10(np.maximum(psd, 1e-12))
+        max_db = np.max(psd_db)
+
+        # 1. Extracción Estricta de Frecuencias (Basado en el ruido de fondo general)
+        umbral_24 = max_db - 24.0
+        indices_24 = np.where(psd_db >= umbral_24)[0]
+
+        if len(indices_24) == 0:
+            return 80.0, 6000.0, False
+
+        hpf_final = round(float(freqs[indices_24[0]]), 1)
+        lpf_final = round(float(freqs[indices_24[-1]]), 1)
+
+        # =================================================================
+        # 2. DETECCIÓN DE IA: TEOREMA DE LA VENTANA DESLIZANTE
+        # =================================================================
+        alerta_brickwall = False
+        
+        # Aislamos exclusivamente el espectro superior (ignoramos los graves del palm mute)
+        idx_agudos = np.where(freqs >= 2000.0)[0]
+        
+        if len(idx_agudos) > 10:
+            freqs_agudos = freqs[idx_agudos]
+            psd_agudos = psd_db[idx_agudos]
+            
+            # Calculamos cuántos índices equivalen a 500 Hz en la FFT actual
+            resolucion_hz = freqs_agudos[1] - freqs_agudos[0]
+            saltos_500hz = max(1, int(500.0 / resolucion_hz))
+            
+            # Deslizamos la ventana escaneando el espectro buscando el acantilado
+            for i in range(len(psd_agudos) - saltos_500hz):
+                # Medimos la caída exacta en ese tramo de 500 Hz
+                caida_db = psd_agudos[i] - psd_agudos[i + saltos_500hz]
+                
+                # AXIOMA FÍSICO: Si la pista pierde más de 16 dB de densidad espectral 
+                # en apenas 500 Hz, es matemáticamente un corte digital destructivo (Demucs).
+                if caida_db > 16.0:
+                    alerta_brickwall = True
+                    break # Detonación confirmada, rompemos el bucle.
+
+        return hpf_final, lpf_final, alerta_brickwall
