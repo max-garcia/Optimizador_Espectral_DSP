@@ -99,6 +99,9 @@ class OptimizadorGUI:
         ctk.set_appearance_mode("dark") 
         ctk.set_default_color_theme("blue") 
         
+        self.fuente_botones = ctk.CTkFont(size=12, weight="bold")
+        self.fuente_titulos = ctk.CTkFont(size=11, weight="bold")
+
         self.motor = MotorTonalDSP()
         self.seguridad = CriptografiaHWID()
         
@@ -154,6 +157,15 @@ class OptimizadorGUI:
 
     def construir_rama_nam(self):
         """Topología Premium: Rama A con Agrupamiento Lógico Simétrico a la Rama B."""
+        
+        # =================================================================
+        # AXIOMA TIPOGRÁFICO (Single Source of Truth)
+        # =================================================================
+        fuente_titulos = ctk.CTkFont(size=11, weight="bold")
+        fuente_botones = ctk.CTkFont(size=12, weight="bold")
+        fuente_acciones = ctk.CTkFont(size=13, weight="bold")
+        fuente_telemetria = ctk.CTkFont(family="monospace", size=12)
+
         self.frame_master_nam = ctk.CTkFrame(self.tab_nam, fg_color="transparent")
         self.frame_master_nam.pack(expand=True, fill=ctk.BOTH, padx=10, pady=10)
         
@@ -165,20 +177,20 @@ class OptimizadorGUI:
         frame_col_obj = ctk.CTkFrame(frame_inputs, fg_color="transparent")
         frame_col_obj.pack(side=tk.LEFT, expand=True, fill=ctk.BOTH, padx=20, pady=20)
         
-        ctk.CTkLabel(frame_col_obj, text="DIAGNÓSTICO OBJETIVO", font=('SF Pro Display', 11, 'bold'), text_color="#aaaaaa").pack(anchor=tk.W)
-        self.btn_cargar_obj_nam = ctk.CTkButton(frame_col_obj, text="1A. Cargar WAV Aislado", height=35, command=lambda: self.cargar_archivo("Objetivo_NAM"))
+        ctk.CTkLabel(frame_col_obj, text="DIAGNÓSTICO OBJETIVO", font=fuente_titulos, text_color="#aaaaaa").pack(anchor=tk.W)
+        self.btn_cargar_obj_nam = ctk.CTkButton(frame_col_obj, text="1A. Cargar WAV Aislado", height=35, font=fuente_botones, command=lambda: self.cargar_archivo("Objetivo_NAM"))
         self.btn_cargar_obj_nam.pack(fill=ctk.X, pady=(10, 5))
         
         frame_ia_params = ctk.CTkFrame(frame_col_obj, fg_color="transparent")
         frame_ia_params.pack(fill=ctk.X, pady=5)
 
         self.var_demucs_hw_nam = ctk.StringVar(value="cpu")
-        ctk.CTkOptionMenu(frame_ia_params, variable=self.var_demucs_hw_nam, values=["cpu", "cuda"], width=80, height=25).pack(side=tk.LEFT, padx=(0, 5))
+        ctk.CTkOptionMenu(frame_ia_params, variable=self.var_demucs_hw_nam, values=["cpu", "cuda"], width=80, height=25, font=fuente_botones).pack(side=tk.LEFT, padx=(0, 5))
 
         self.var_demucs_calidad_nam = ctk.StringVar(value="Estándar")
-        ctk.CTkOptionMenu(frame_ia_params, variable=self.var_demucs_calidad_nam, values=["Básico", "Estándar", "Pro"], width=110, height=25).pack(side=tk.LEFT)
+        ctk.CTkOptionMenu(frame_ia_params, variable=self.var_demucs_calidad_nam, values=["Básico", "Estándar", "Pro"], width=110, height=25, font=fuente_botones).pack(side=tk.LEFT)
 
-        self.btn_extraer_ia_nam = ctk.CTkButton(frame_col_obj, text="1B. Extraer con IA", height=35, fg_color="#D04A02", hover_color="#A03A02", command=lambda: self.aislar_hilo_extraccion_ia(rama="NAM"))
+        self.btn_extraer_ia_nam = ctk.CTkButton(frame_col_obj, text="1B. Extraer con IA", height=35, font=fuente_botones, fg_color="#D04A02", hover_color="#A03A02", command=lambda: self.aislar_hilo_extraccion_ia(rama="NAM"))
         self.btn_extraer_ia_nam.pack(fill=ctk.X, pady=(5, 0))
 
         # Divisor visual vertical
@@ -188,39 +200,39 @@ class OptimizadorGUI:
         frame_col_fnt = ctk.CTkFrame(frame_inputs, fg_color="transparent")
         frame_col_fnt.pack(side=tk.LEFT, expand=True, fill=ctk.BOTH, padx=20, pady=20)
         
-        ctk.CTkLabel(frame_col_fnt, text="SEÑAL DE ORIGEN Y BANCOS", font=('SF Pro Display', 11, 'bold'), text_color="#aaaaaa").pack(anchor=tk.W)
+        ctk.CTkLabel(frame_col_fnt, text="SEÑAL DE ORIGEN Y BANCOS", font=fuente_titulos, text_color="#aaaaaa").pack(anchor=tk.W)
         
-        self.btn_cargar_di_nam = ctk.CTkButton(frame_col_fnt, text="2. Cargar Tono DI Limpio", height=35, command=lambda: self.cargar_archivo("DI_NAM"))
+        self.btn_cargar_di_nam = ctk.CTkButton(frame_col_fnt, text="2. Cargar Tono DI Limpio", height=35, font=fuente_botones, command=lambda: self.cargar_archivo("DI_NAM"))
         self.btn_cargar_di_nam.pack(fill=ctk.X, pady=(10, 5))
 
         frame_dirs = ctk.CTkFrame(frame_col_fnt, fg_color="transparent")
         frame_dirs.pack(fill=ctk.X, pady=5)
 
-        self.btn_cargar_dir_nam = ctk.CTkButton(frame_dirs, text="3. Banco NAM", height=35, command=self.seleccionar_directorio_nam)
+        self.btn_cargar_dir_nam = ctk.CTkButton(frame_dirs, text="3. Banco NAM", height=35, font=fuente_botones, command=self.seleccionar_directorio_nam)
         self.btn_cargar_dir_nam.pack(side=tk.LEFT, expand=True, fill=ctk.X, padx=(0, 5))
 
-        self.btn_cargar_dir_ir = ctk.CTkButton(frame_dirs, text="4. Banco IRs", height=35, command=self.seleccionar_directorio_ir)
+        self.btn_cargar_dir_ir = ctk.CTkButton(frame_dirs, text="4. Banco IRs", height=35, font=fuente_botones, command=self.seleccionar_directorio_ir)
         self.btn_cargar_dir_ir.pack(side=tk.LEFT, expand=True, fill=ctk.X)
 
         # --- SECCIÓN CENTRAL: MOTOR DE BÚSQUEDA ---
         frame_engine = ctk.CTkFrame(self.frame_master_nam, fg_color="#1a1a1a", corner_radius=12, border_width=1, border_color="#1f538d")
         frame_engine.pack(fill=ctk.X, pady=10, padx=10)
 
-        ctk.CTkLabel(frame_engine, text="TOLERANCIA TOPOLÓGICA (MSE LIMIT)", font=('SF Pro Display', 11, 'bold'), text_color="#3b82f6").pack(pady=(15, 5))
+        ctk.CTkLabel(frame_engine, text="TOLERANCIA TOPOLÓGICA (MSE LIMIT)", font=fuente_titulos, text_color="#3b82f6").pack(pady=(15, 5))
         
         valores_tol = ["Perfección Topológica (MSE < 5.0)", "Aceptable Comercial (MSE < 15.0)", "Aproximación (MSE < 30.0)"]
         self.var_tolerancia = ctk.StringVar(value=valores_tol[1])
-        self.selector_tolerancia = ctk.CTkOptionMenu(frame_engine, variable=self.var_tolerancia, values=valores_tol, width=500, height=35)
+        self.selector_tolerancia = ctk.CTkOptionMenu(frame_engine, variable=self.var_tolerancia, values=valores_tol, width=500, height=35, font=fuente_botones)
         self.selector_tolerancia.pack(pady=10)
 
         frame_acciones = ctk.CTkFrame(frame_engine, fg_color="transparent")
         frame_acciones.pack(pady=(10, 20))
 
-        self.btn_buscar_nam = ctk.CTkButton(frame_acciones, text="EJECUTAR MATRIZ COMBINATORIA", width=400, height=45, fg_color="#1f538d", hover_color="#14375e", font=('SF Pro Display', 13, 'bold'), command=self.aislar_hilo_busqueda_nam)
+        self.btn_buscar_nam = ctk.CTkButton(frame_acciones, text="EJECUTAR MATRIZ COMBINATORIA", width=400, height=45, fg_color="#1f538d", hover_color="#14375e", font=fuente_acciones, command=self.aislar_hilo_busqueda_nam)
         self.btn_buscar_nam.pack(pady=5)
 
         # --- SECCIÓN INFERIOR: TELEMETRÍA ---
-        self.lbl_resultado_nam = ctk.CTkLabel(self.frame_master_nam, text="SISTEMA LISTO", font=('Monospace', 12), text_color="#00ffcc")
+        self.lbl_resultado_nam = ctk.CTkLabel(self.frame_master_nam, text="SISTEMA LISTO", font=fuente_telemetria, text_color="#00ffcc")
         self.lbl_resultado_nam.pack(pady=5)
         
         self.frame_progreso_nam = ctk.CTkFrame(self.frame_master_nam, fg_color="transparent")
@@ -230,10 +242,17 @@ class OptimizadorGUI:
         self.barra_progreso_nam.pack(side=tk.LEFT, fill=ctk.X, expand=True, padx=(0, 15))
         self.barra_progreso_nam.set(0.0) 
         
-        self.lbl_porcentaje_nam = ctk.CTkLabel(self.frame_progreso_nam, text="0%", font=('SF Pro Display', 12, 'bold'))
+        self.lbl_porcentaje_nam = ctk.CTkLabel(self.frame_progreso_nam, text="0%", font=fuente_botones)
         self.lbl_porcentaje_nam.pack(side=tk.RIGHT, padx=(0, 15))
 
     def construir_rama_hardware(self):
+        # =================================================================
+        # AXIOMA TIPOGRÁFICO (Single Source of Truth)
+        # =================================================================
+        fuente_titulos = ctk.CTkFont(size=11, weight="bold")
+        fuente_botones = ctk.CTkFont(size=12, weight="bold")
+        fuente_acciones = ctk.CTkFont(size=13, weight="bold")
+
         self.frame_master_hw = ctk.CTkFrame(self.tab_hardware, fg_color="transparent")
         self.frame_master_hw.pack(expand=True, fill=ctk.BOTH, padx=10, pady=10)
         
@@ -243,22 +262,21 @@ class OptimizadorGUI:
         frame_col_obj = ctk.CTkFrame(frame_inputs, fg_color="transparent")
         frame_col_obj.pack(side=tk.LEFT, expand=True, fill=ctk.BOTH, padx=20, pady=20)
         
-        ctk.CTkLabel(frame_col_obj, text="DIAGNÓSTICO OBJETIVO", font=('SF Pro Display', 11, 'bold'), text_color="#aaaaaa").pack(anchor=tk.W)
-        self.btn_cargar_obj = ctk.CTkButton(frame_col_obj, text="1A. Cargar WAV Aislado", height=35, command=lambda: self.cargar_archivo("Objetivo"))
+        ctk.CTkLabel(frame_col_obj, text="DIAGNÓSTICO OBJETIVO", font=fuente_titulos, text_color="#aaaaaa").pack(anchor=tk.W)
+        
+        self.btn_cargar_obj = ctk.CTkButton(frame_col_obj, text="1A. Cargar WAV Aislado", height=35, font=fuente_botones, command=lambda: self.cargar_archivo("Objetivo"))
         self.btn_cargar_obj.pack(fill=ctk.X, pady=(10, 5))
         
-        # --- INYECCIÓN DE VARIABLES DE IA (Motor y Calidad) ---
         frame_ia_params = ctk.CTkFrame(frame_col_obj, fg_color="transparent")
         frame_ia_params.pack(fill=ctk.X, pady=5)
 
         self.var_demucs_hw = ctk.StringVar(value="cpu")
-        ctk.CTkOptionMenu(frame_ia_params, variable=self.var_demucs_hw, values=["cpu", "cuda"], width=80, height=25).pack(side=tk.LEFT, padx=(0, 5))
+        ctk.CTkOptionMenu(frame_ia_params, variable=self.var_demucs_hw, values=["cpu", "cuda"], width=80, height=25, font=fuente_botones).pack(side=tk.LEFT, padx=(0, 5))
 
         self.var_demucs_calidad = ctk.StringVar(value="Estándar")
-        ctk.CTkOptionMenu(frame_ia_params, variable=self.var_demucs_calidad, values=["Básico", "Estándar", "Pro"], width=110, height=25).pack(side=tk.LEFT)
-        # ------------------------------------------------------
+        ctk.CTkOptionMenu(frame_ia_params, variable=self.var_demucs_calidad, values=["Básico", "Estándar", "Pro"], width=110, height=25, font=fuente_botones).pack(side=tk.LEFT)
 
-        self.btn_extraer_ia = ctk.CTkButton(frame_col_obj, text="1B. Extraer con IA", height=35, fg_color="#D04A02", hover_color="#A03A02", command=lambda: self.aislar_hilo_extraccion_ia(rama="HW"))
+        self.btn_extraer_ia = ctk.CTkButton(frame_col_obj, text="1B. Extraer con IA", height=35, font=fuente_botones, fg_color="#D04A02", hover_color="#A03A02", command=lambda: self.aislar_hilo_extraccion_ia(rama="HW"))
         self.btn_extraer_ia.pack(fill=ctk.X, pady=(5, 0))
 
         ctk.CTkFrame(frame_inputs, width=2, fg_color="#333333").pack(side=tk.LEFT, fill=tk.Y, pady=20)
@@ -266,14 +284,15 @@ class OptimizadorGUI:
         frame_col_fnt = ctk.CTkFrame(frame_inputs, fg_color="transparent")
         frame_col_fnt.pack(side=tk.LEFT, expand=True, fill=ctk.BOTH, padx=20, pady=20)
         
-        ctk.CTkLabel(frame_col_fnt, text="SEÑAL DE ORIGEN (DI/CAB)", font=('SF Pro Display', 11, 'bold'), text_color="#aaaaaa").pack(anchor=tk.W)
-        self.btn_cargar_fnt = ctk.CTkButton(frame_col_fnt, text="2. Cargar Tono Grabado", height=35, command=lambda: self.cargar_archivo("Fuente"))
+        ctk.CTkLabel(frame_col_fnt, text="SEÑAL DE ORIGEN (DI/CAB)", font=fuente_titulos, text_color="#aaaaaa").pack(anchor=tk.W)
+        
+        self.btn_cargar_fnt = ctk.CTkButton(frame_col_fnt, text="2. Cargar Tono Grabado", height=35, font=fuente_botones, command=lambda: self.cargar_archivo("Fuente"))
         self.btn_cargar_fnt.pack(fill=ctk.X, pady=(10, 0))
 
         frame_engine = ctk.CTkFrame(self.frame_master_hw, fg_color="#1a1a1a", corner_radius=12, border_width=1, border_color="#1f538d")
         frame_engine.pack(fill=ctk.X, pady=10, padx=10)
 
-        ctk.CTkLabel(frame_engine, text="CONFIGURACIÓN DEL PROCESADOR (DSP TARGET)", font=('SF Pro Display', 11, 'bold'), text_color="#3b82f6").pack(pady=(15, 5))
+        ctk.CTkLabel(frame_engine, text="CONFIGURACIÓN DEL PROCESADOR (DSP TARGET)", font=fuente_titulos, text_color="#3b82f6").pack(pady=(15, 5))
         
         valores_hw = [
             "DAW / PC Plugin (FIR Estándar | 8192 muestras | 48 kHz)",
@@ -291,16 +310,16 @@ class OptimizadorGUI:
             "Cuvave / M-Vave Cube (512 muestras | 44.1 kHz)"
         ]
         self.variable_hardware = ctk.StringVar(value=valores_hw[0])
-        self.selector_hardware = ctk.CTkOptionMenu(frame_engine, variable=self.variable_hardware, values=valores_hw, width=500, height=35, dynamic_resizing=False)
+        self.selector_hardware = ctk.CTkOptionMenu(frame_engine, variable=self.variable_hardware, values=valores_hw, width=500, height=35, dynamic_resizing=False, font=fuente_botones)
         self.selector_hardware.pack(pady=10)
 
         frame_acciones = ctk.CTkFrame(frame_engine, fg_color="transparent")
         frame_acciones.pack(pady=(10, 20))
 
-        self.btn_analizar = ctk.CTkButton(frame_acciones, text="ANALIZAR ESPECTRO", width=200, height=45, font=('SF Pro Display', 13, 'bold'), command=self.aislar_hilo_analisis)
+        self.btn_analizar = ctk.CTkButton(frame_acciones, text="ANALIZAR ESPECTRO", width=200, height=45, font=fuente_acciones, command=self.aislar_hilo_analisis)
         self.btn_analizar.pack(side=tk.LEFT, padx=10)
 
-        self.btn_exportar = ctk.CTkButton(frame_acciones, text="SINTETIZAR FILTRO", width=200, height=45, fg_color="#28a745", hover_color="#218838", font=('SF Pro Display', 13, 'bold'), command=self.aislar_hilo_sintesis)
+        self.btn_exportar = ctk.CTkButton(frame_acciones, text="SINTETIZAR FILTRO", width=200, height=45, fg_color="#28a745", hover_color="#218838", font=fuente_acciones, command=self.aislar_hilo_sintesis)
         self.btn_exportar.pack(side=tk.LEFT, padx=10)
 
         self.frame_progreso_hw = ctk.CTkFrame(self.frame_master_hw, fg_color="transparent")
@@ -310,7 +329,7 @@ class OptimizadorGUI:
         self.barra_progreso_hw.pack(side=tk.LEFT, fill=ctk.X, expand=True, padx=(0, 15))
         self.barra_progreso_hw.set(0.0)
         
-        self.lbl_porcentaje_hw = ctk.CTkLabel(self.frame_progreso_hw, text="0%", font=('SF Pro Display', 12, 'bold'))
+        self.lbl_porcentaje_hw = ctk.CTkLabel(self.frame_progreso_hw, text="0%", font=fuente_botones)
         self.lbl_porcentaje_hw.pack(side=tk.RIGHT, padx=(0, 15))
 
     def aislar_hilo_extraccion_ia(self, rama="HW"):
