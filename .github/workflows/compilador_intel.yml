@@ -1,46 +1,36 @@
 name: Sintesis Compilador Intel (x86_64)
 
-# El disparador manual nos permite ejecutarlo solo cuando estemos listos, sin gastar minutos de servidor por cada commit.
-on: 
-  workflow_dispatch:
+on: workflow_dispatch
 
 jobs:
   build_intel:
-    # AXIOMA FÍSICO: macos-13 garantiza la asignación de un procesador Intel x86_64.
     runs-on: macos-13 
 
     steps:
-    - name: 1. Extracción del Código Fuente (Checkout)
+    - name: 1. Extraccion del Codigo Fuente
       uses: actions/checkout@v4
 
-    - name: 2. Inyección del Intérprete Python (x86_64)
+    - name: 2. Inyeccion del Interprete Python (x86_64)
       uses: actions/setup-python@v5
       with:
         python-version: '3.12'
         architecture: 'x64'
 
-    - name: 3. Construcción del Espacio Vectorial (Dependencias)
+    - name: 3. Construccion del Espacio Vectorial
       run: |
         python -m pip install --upgrade pip setuptools wheel
         pip install numpy scipy matplotlib customtkinter pyinstaller demucs
 
-    - name: 4. Ejecución del Motor de Empaquetado (PyInstaller)
+    - name: 4. Ejecucion del Motor de Empaquetado
       run: |
         DEMUCS_PATH=$(python -c "import demucs, os; print(os.path.dirname(demucs.__file__))")
-        pyinstaller --noconfirm --windowed --noconsole \
-          --icon="icon.icns" \
-          --add-data "TGN_DSP_Engine.dylib:." \
-          --add-data "$DEMUCS_PATH/remote:demucs/remote" \
-          --hidden-import "demucs.separate" \
-          --hidden-import "demucs.pretrained" \
-          --name "TGN_Tone_Architect_Intel" \
-          interfaz_gui.py
+        pyinstaller --noconfirm --windowed --noconsole --icon="icon.icns" --add-data "TGN_DSP_Engine.dylib:." --add-data "$DEMUCS_PATH/remote:demucs/remote" --hidden-import "demucs.separate" --hidden-import "demucs.pretrained" --name "TGN_Tone_Architect_Intel" interfaz_gui.py
 
-    - name: 5. Generación del Contenedor Criptográfico (DMG)
+    - name: 5. Generacion del Contenedor Criptografico
       run: |
         hdiutil create -volname "TGN Tone Architect v1.5 (Intel)" -srcfolder dist/TGN_Tone_Architect_Intel.app -ov -format UDZO TGN_Tone_Architect_v1.5_Intel.dmg
 
-    - name: 6. Extracción del Artefacto Final
+    - name: 6. Extraccion del Artefacto
       uses: actions/upload-artifact@v4
       with:
         name: Instalador_Mac_Intel_v1.5
